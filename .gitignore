@@ -1,0 +1,124 @@
+# ===== ОС и IDE =====
+.DS_Store
+Thumbs.db
+Icon?
+ehthumbs.db
+
+.idea/
+.vscode/
+*.iml
+
+# ===== Python / FastAPI (backend) =====
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Виртуальные окружения
+.env/
+.venv/
+venv/
+env/
+ENV/
+
+# Секреты и конфиги окружений (оставляем пример)
+*.env
+*.env.*
+!.env.example
+
+# Кэши и артефакты
+.python-version
+.mypy_cache/
+.pytest_cache/
+pytestdebug.log
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+.tox/
+ruff_cache/
+.dmypy.json
+
+# Сборка/дистрибутивы
+build/
+dist/
+*.egg-info/
+*.egg
+wheels/
+
+# Базы данных локальные
+*.sqlite3
+*.db
+instance/
+data/*.db
+data/*.sqlite3
+
+# Логи и временные файлы
+logs/
+*.log
+*.pid
+tmp/
+temp/
+run/
+
+# Alembic (миграции — храним, но игнорим артефакты)
+alembic/*.pyc
+alembic/**/__pycache__/
+
+# Uvicorn/Gunicorn (временные)
+*.access.log
+*.error.log
+
+# ===== Dramatiq =====
+# Dramatiq сам по себе файлов не создает, но на всякий случай:
+.dramatiq/
+dramatiq_*.json
+*.dramatiq.*
+# pid/lock, если используете supervisor/systemd локально
+*.lock
+
+# ===== React / Frontend (Node.js) =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.parcel-cache/
+.eslintcache
+
+# Vite / CRA / Next / Storybook артефакты сборки
+dist/
+build/
+.next/
+out/
+.storybook-out/
+storybook-static/
+.vite/
+
+# Тестовые артефакты фронта
+coverage/
+
+# Типичные временные
+*.local
+*.tmp
+
+# ===== Докер (локальные файлы, опционально) =====
+# Если используете override только локально — раскомментируйте:
+# docker-compose.override.yml
+# *.env.docker.local
+
+# ===== Медиа/загрузки (если генерируются локально) =====
+uploads/
+media/
+public/uploads/
+frontend/public/uploads/
+backend/app/static/uploads/
+
+# ===== Jupyter (если используете для экспериментов) =====
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ===== Разное =====
+# Сгенерированные файлы и артефакты инструментов
+*.swp
+*.swo
+*.orig
