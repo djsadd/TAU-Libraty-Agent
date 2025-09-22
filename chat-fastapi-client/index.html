@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Чат (FastAPI)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#0b1020;--glass:#0f162e;--panel:#0c1328;--border:rgba(255,255,255,.08);
+--muted:#9fb0d3;--text:#eaf1ff;--brand:#7aa2ff;--brand-2:#a97bff;--ok:#27d07d;--err:#ff5d5d;
+}
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial; color:var(--text);
+background: radial-gradient(80% 60% at 50% 0%, #1b2654 0%, var(--bg) 60%) fixed;}
+.container{max-width:1000px;margin:0 auto;padding:24px}
+.app{border:1px solid var(--border);border-radius:20px;overflow:hidden;
+background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+box-shadow: 0 20px 60px rgba(0,0,0,.35)}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);
+background:linear-gradient(90deg, rgba(122,162,255,.15), rgba(169,123,255,.12));}
+.brand{display:flex;gap:12px;align-items:center}
+.logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--brand),var(--brand-2)); box-shadow:0 6px 20px rgba(122,162,255,.35)}
+.title{font-weight:800; letter-spacing:.2px}
+.status{font-size:12px;color:var(--muted)}
+.pill{border:1px solid var(--border);padding:4px 10px;border-radius:999px}
+.ok{color:var(--ok)}.err{color:var(--err)}
+.chat{height:62vh;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:14px;background:linear-gradient(180deg, rgba(0,0,0,.08), rgba(0,0,0,.02))}
+.group{display:flex;flex-direction:column;gap:6px}
+.meta{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px}
+.row{display:flex;gap:10px;padding:14px;border-top:1px solid var(--border); background:var(--panel)}
+.textarea{flex:1;background:var(--glass);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px 14px;min-height:44px;resize:vertical}
+.btn{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#0b1020;font-weight:800;border:none;border-radius:12px;padding:0 16px;cursor:pointer; min-width:120px}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+
+
+.bubble{max-width:80%;padding:12px 14px;border-radius:16px; line-height:1.5; white-space:pre-wrap;word-break:break-word;position:relative}
+.user{align-self:flex-end}
+.user .bubble{background:rgba(122,162,255,.15); border:1px solid rgba(122,162,255,.35)}
+.assistant{align-self:flex-start}
+.assistant .bubble{background:rgba(255,255,255,.04); border:1px solid var(--border)}
+
+
+.toolbar{display:flex;gap:10px;align-items:center}
+.number{width:70px;background:var(--glass);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+.input{flex:1;background:var(--glass);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+
+
+.chip{font-size:12px;color:var(--muted);border:1px dashed var(--border);padding:6px 10px;border-radius:999px}
+.footer{display:flex;gap:10px;padding:10px 14px;border-top:1px dashed var(--border);align-items:center;background:linear-gradient(180deg, rgba(0,0,0,.02), rgba(0,0,0,.06))}
+
+
+.skeleton{height:56px;border-radius:14px;background:linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.02), rgba(255,255,255,.06));
+animation:shimmer 1.2s infinite; background-size:200% 100%}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.icon{width:18px;height:18px;opacity:.9}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/index.tsx"></script>
+</body>
+</html>
