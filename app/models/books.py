@@ -12,6 +12,7 @@ class Document(Base):
     title = Column(String, nullable=False)              # название файла / книги
     file_path = Column(String, nullable=False)          # путь к файлу в хранилище
     file_type = Column(String, nullable=True)           # pdf | docx | txt | ...
+    kabis_id = Column(String, nullable=True)           # ID - из базы кабис
 
     description = Column(Text, nullable=True)           # описание / метаданные
     owner = Column(String, nullable=True)               # кто загрузил
