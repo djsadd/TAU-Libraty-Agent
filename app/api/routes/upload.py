@@ -8,6 +8,7 @@ from app.core.db import SessionLocal
 from app.models.job import Job, JobStatus
 from app.models.books import Document
 from ...worker import ingest_job  # импорт актёра
+from app.core.book_quality_check import check_file
 
 
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -20,7 +21,11 @@ async def upload(file: UploadFile):
     save_path = settings.UPLOAD_DIR / file.filename
     with open(save_path, "wb") as f:
         f.write(await file.read())
-
+    book_quality = check_file(save_path)
+    if book_quality["verdict"] in ("OK_TEXT", "OK_TEXT_PDF", "OK_OCR"):
+        print("✅ Документ читаемый, можно индексировать")
+    else:
+        return {"status": "error, document not readable"}
     # 2) создать Document (если есть) -> здесь «document_id»
     document_id = str(uuid.uuid4())
     # 2) создаём документ
