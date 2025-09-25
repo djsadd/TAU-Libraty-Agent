@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 150
     TOP_K: int = 5
 
+    KABIS_USERNAME: str
+    KABIS_PASSWORD: str
+
     # Настройки для pydantic-settings v2
     model_config = SettingsConfigDict(
         env_file=".env",

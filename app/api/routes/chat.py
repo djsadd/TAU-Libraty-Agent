@@ -4,7 +4,6 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from fastapi.responses import JSONResponse
 from ...deps import get_retriever_dep, get_llm
-
 router = APIRouter(prefix="/api", tags=["chat"])
 
 

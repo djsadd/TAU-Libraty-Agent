@@ -1,4 +1,5 @@
 from pathlib import Path
+from langchain.schema import Document
 
 
 def load_docs(path: str):
@@ -31,3 +32,35 @@ def load_docs(path: str):
         d.metadata.setdefault("source", str(p))
         d.metadata.setdefault("title", p.stem)
     return docs
+
+
+def load_title_only(meta: dict) -> list[Document]:
+    """
+    Создаёт список Document из словаря метаданных, если файла нет.
+    Обязательные ключи: title (строка).
+    Опциональные: author, id_book, year, lang, dept_code и т.п.
+    """
+    title = (meta.get("title") or "").strip()
+    if not title:
+        raise ValueError("В meta должен быть хотя бы 'title'")
+
+    author = (meta.get("author") or "").strip()
+    content = f"{author}. {title}" if author else title
+
+    # метаданные по умолчанию
+    metadata = {
+        "title": title,
+        "author": author or None,
+        "page": None,            # для консистентности с load_docs
+        "file_type": "none",
+        "source": None,
+        "has_text": False,       # признак, что текста нет
+    }
+
+    # добавляем все остальные поля, что передали
+    for k, v in meta.items():
+        metadata.setdefault(k, v)
+
+    doc = Document(page_content=content, metadata=metadata)
+    return [doc]
+

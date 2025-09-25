@@ -4,6 +4,7 @@ from .core.cors import setup_cors
 from .api.routes.upload import router as upload_router
 from .api.routes.chat import router as chat_router
 from .api.routes.jobs import router as jobs_router
+from .api.routes.kabis_integrate import router as kabis_upload
 
 
 app = FastAPI(
@@ -20,3 +21,4 @@ setup_cors(app)
 app.include_router(upload_router)
 app.include_router(chat_router)
 app.include_router(jobs_router)
+app.include_router(kabis_upload)
