@@ -18,6 +18,7 @@ files_db: dict[str, dict] = {}
 @router.post("/upload", summary="Загрузить файл",
              description="Поддерживаются PDF, TXT, DOCX, EPUB. Файл сохраняется в папке `uploads`.")
 async def upload(file: UploadFile):
+
     save_path = settings.UPLOAD_DIR / file.filename
     with open(save_path, "wb") as f:
         f.write(await file.read())
@@ -26,8 +27,10 @@ async def upload(file: UploadFile):
         print("✅ Документ читаемый, можно индексировать")
     else:
         return {"status": "error, document not readable"}
+
     # 2) создать Document (если есть) -> здесь «document_id»
     document_id = str(uuid.uuid4())
+
     # 2) создаём документ
     db_doc = SessionLocal()
 

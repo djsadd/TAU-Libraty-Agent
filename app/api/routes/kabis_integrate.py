@@ -89,6 +89,7 @@ async def kabis_upload():
                     token,
                     params={"start_pos": 1, "end_pos": 100}
                 ).json()
+                print(json_kabis)
                 rows = parse_payload(json_kabis)
                 rows_flat = flatten_copies(rows)
                 # save_kabis_rows(session, list(unique_rows.values()))
@@ -105,11 +106,10 @@ async def kabis_upload():
              description="Индексирование библиотеки кабис")
 async def kabis_index():
     with SessionLocal() as session:
-        stmt = select(Kabis).where(Kabis.is_indexed == False)
+        stmt = select(Kabis).where(Kabis.is_indexed==False)
         rows = session.scalars(stmt).all()
         for row in rows:
             row_dict = {k: v for k, v in row.__dict__.items() if not k.startswith("_")}
-            row_dict['title'] = row_dict["subjects"]
             print(row_dict)
             document_id = str(uuid.uuid4())
 

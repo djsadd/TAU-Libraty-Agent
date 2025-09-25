@@ -17,9 +17,10 @@ def _format_docs(docs, per_chunk_chars=800, max_chunks=5):
     for d in docs[:max_chunks]:
         m = d.metadata or {}
         title = m.get("title", "книга")
+        author = m.get("auhor", "книга - автор")
         page = m.get("page", "?")
         text = (d.page_content or "")[:per_chunk_chars].strip()
-        lines.append(f"[{title}, стр. {page}] {text}")
+        lines.append(f"[{title}, автор+книга(Если есть): {author}, стр. {page}] {text}")
     return "\n\n".join(lines)
 
 
@@ -31,7 +32,9 @@ async def chat(req: ChatRequest,
     try:
         prompt = ChatPromptTemplate.from_messages([
             ("system", "Ты помощник по поиску литературы. Отвечай строго по контексту. "
-                       "Если ответа нет — так и скажи и не передавай литературу. Если нет файла и страницы, то передавай - page_content(книга) В конце укажи источники «Стр. X, файл Y»."),
+                       "Если ответа нет — так и скажи и не передавай литературу.В конце укажи источники «Стр. X, файл Y»."
+                       "Если источник не обладает страницей и файлом, то скажи что существует книга в которой вы можете изучить"
+                       "информацию, передай название. Эти книги есть во внутренней библиотеки университета Туран-Астана"),
             ("human", "Вопрос: {question}\n\nКонтекст:\n{context}")
         ])
 

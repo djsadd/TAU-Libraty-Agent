@@ -6,7 +6,6 @@ def load_docs(path: str):
     p = Path(path)
     suffix = p.suffix.lower()
 
-    print(p)
     if suffix == ".pdf":
         from langchain_community.document_loaders import PyPDFLoader
         docs = PyPDFLoader(str(p)).load()

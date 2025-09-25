@@ -194,60 +194,14 @@ def parse_idbk(table: BeautifulSoup) -> Optional[int]:
 
 
 def parse_card_html(card_html: str) -> Dict[str, Any]:
-    """
-    Главный парсер одной карточки.
-    """
     soup = BeautifulSoup(card_html, "html.parser")
     table = soup.find("table")
     if table is None:
-        # иногда может прилететь пусто — вернём минимум
         return {}
 
     pos_number, bbk_top, dept_code, lang = parse_header_info(table)
 
-    # ячейка после nowrap/bold содержит автор/заглавие
-    # берём первый <td colspan=2><b>...</b> в теле (не самый верхний bbk)
-    bolds = table.find_all("b")
-    # первый b — это bbk_top, а второй b обычно автор/заголовок
-    author, title = "", ""
-    if len(bolds) >= 2:
-        author, title = parse_author_title(bolds[1])
-
-    # собрать текст сразу после жирного (публикационные сведения)
-    pub_info_text = ""
-    if len(bolds) >= 2:
-        accum = []
-        # пройти по соседям второго <b> до <br> или конца строки
-        for sib in bolds[1].next_siblings:
-            if getattr(sib, "name", None) == "br":
-                break
-            accum.append(str(sib))
-        pub_info_text = clean_spaces(BeautifulSoup("".join(accum), "html.parser").get_text(" ", strip=True))
-
-    pub = parse_pub_info(pub_info_text)
-    subjects_text = ""
-    copies_div = table.select_one("div[class='10pt']") or table.find("div", {"class": "10pt"})
-    # текст между концом публикационных сведений и блоком 10pt часто — это рубрики (1. ... - - ...).
-    # Возьмём весь текст таблицы и вырежем кусок до <div class=10pt>.
-    full_text = text_of(table)
-    if copies_div:
-        before_copies = text_of(copies_div.find_previous(string=True)) if copies_div.find_previous(string=True) else ""
-        # fallback: если не нашли «предыдущий текст», используем общий текст и удалим из него содержимое copies_div
-        full_no_copies = full_text.replace(text_of(copies_div), "")
-        subjects_text = full_no_copies
-
-    # попытаемся найти участок, начинающийся на "1." — это основной признак рубрик
-    m_idx = re.search(r"\b1\.\s", subjects_text)
-    subjects = []
-    if m_idx:
-        subjects = parse_subjects(subjects_text[m_idx.start():])
-
-    copies = parse_copies(copies_div)
-    links = parse_links(table)
-    bbk_tail = parse_bbk_tail(table)
-    idbk = parse_idbk(table)
-
-    # доп. сигла в левой узкой колонке (например 'Ж83', 'С30' и т.п.)
+    # --- Сигла в узкой колонке (например, Ж83) ---
     sigla = ""
     narrow_td = None
     for td in table.find_all("td"):
@@ -258,6 +212,58 @@ def parse_card_html(card_html: str) -> Dict[str, Any]:
         b = narrow_td.find("b")
         if b:
             sigla = clean_spaces(b.get_text())
+
+    # --- Автор/заглавие: берем вторую ячейку с colspan=2 ---
+    cols2 = [td for td in table.find_all("td") if td.has_attr("colspan")]
+    author, title = "", ""
+    pub_info_text = ""
+
+    if len(cols2) >= 2:
+        body_td = cols2[1]               # вторая colspan=2 — там <b>Автор<br>Заглавие</b>
+        ab = body_td.find("b")
+        if ab:
+            author, title = parse_author_title(ab)
+
+            # Собираем публикационные сведения: все, что после ab,
+            # до блока экземпляров (div.10pt) или до p.bak
+            acc = []
+            for sib in ab.next_siblings:
+                # стоп, если дошли до блоков копий или ББК-хвоста
+                if getattr(sib, "name", None) == "div" and "10pt" in (sib.get("class") or []):
+                    break
+                if getattr(sib, "name", None) == "p" and "bak" in (sib.get("class") or []):
+                    break
+                acc.append(str(sib))
+            pub_info_text = clean_spaces(BeautifulSoup("".join(acc), "html.parser").get_text(" ", strip=True))
+    else:
+        # Fallback: ищем <b>, внутри которого есть <br> (часто это автор/заглавие)
+        b_candidates = table.find_all("b")
+        for b in b_candidates:
+            if "<br" in b.decode_contents().lower():
+                author, title = parse_author_title(b)
+                # собрать публикационные сведения как выше
+                acc = []
+                for sib in b.next_siblings:
+                    if getattr(sib, "name", None) == "div" and "10pt" in (sib.get("class") or []):
+                        break
+                    if getattr(sib, "name", None) == "p" and "bak" in (sib.get("class") or []):
+                        break
+                    acc.append(str(sib))
+                pub_info_text = clean_spaces(BeautifulSoup("".join(acc), "html.parser").get_text(" ", strip=True))
+                break
+
+    # --- Остальные поля ---
+    pub = parse_pub_info(pub_info_text)
+    copies_div = table.select_one("div[class='10pt']") or table.find("div", {"class": "10pt"})
+    full_text = text_of(table)
+    subjects_text = full_text.replace(text_of(copies_div), "") if copies_div else full_text
+
+    m_idx = re.search(r"\b1\.\s", subjects_text)
+    subjects = parse_subjects(subjects_text[m_idx.start():]) if m_idx else []
+
+    links = parse_links(table)
+    bbk_tail = parse_bbk_tail(table)
+    idbk = parse_idbk(table)
 
     return {
         "pos": pos_number,
@@ -273,7 +279,7 @@ def parse_card_html(card_html: str) -> Dict[str, Any]:
         "year": pub["year"],
         "isbn": pub["isbn"],
         "subjects": "; ".join(subjects) if subjects else "",
-        "copies": copies,                 # список словарей
+        "copies": parse_copies(copies_div),
         "download_url": links["download_url"],
         "open_url": links["open_url"],
     }

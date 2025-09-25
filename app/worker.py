@@ -89,9 +89,6 @@ def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = Non
         # ... твоя логика извлечения текста ...
         docs = load_docs(save_path)
         # нормализация метаданных
-        for d in docs:
-            d.metadata.setdefault("source", str(save_path))
-            d.metadata.setdefault("title", save_path.stem)
 
         # === chunk ===
         update_job(db, job_id, current_step="chunk", progress_pct=40)
