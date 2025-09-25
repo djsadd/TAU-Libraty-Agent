@@ -8,7 +8,7 @@ from app.core.vectorstore import index_documents
 from app.models.job import Job, JobStatus
 from pathlib import Path
 from .core.config import settings
-
+from app.models.kabis import Kabis
 # 1) подключаем Redis
 broker = RedisBroker(host="localhost", port=6379, db=0)
 dramatiq.set_broker(broker)
@@ -54,7 +54,11 @@ def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = Non
             # === index ===
             update_job(db, job_id, current_step="index", progress_pct=90)
             # ... запись в Qdrant ...
-
+            if meta and meta.get("id_book"):
+                book = db.query(Kabis).filter(Kabis.id_book == str(meta["id_book"])).first()
+                if book:
+                    book.is_indexed = True
+                    db.commit()
             update_job(db, job_id,
                        status=JobStatus.succeeded,
                        current_step="done",

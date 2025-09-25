@@ -109,6 +109,7 @@ async def kabis_index():
         rows = session.scalars(stmt).all()
         for row in rows:
             row_dict = {k: v for k, v in row.__dict__.items() if not k.startswith("_")}
+            row_dict['title'] = row_dict["subjects"]
             print(row_dict)
             document_id = str(uuid.uuid4())
 
@@ -124,5 +125,4 @@ async def kabis_index():
             # 4) поставить в очередь
             ingest_job.send(job.id, meta=row_dict)
             db.commit()
-            break
     return {"Hello": "World"}
