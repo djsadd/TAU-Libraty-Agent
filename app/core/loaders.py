@@ -2,34 +2,68 @@ from pathlib import Path
 from langchain.schema import Document
 
 
+from pathlib import Path
+from PyPDF2 import PdfReader
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    UnstructuredPDFLoader,
+    TextLoader,
+    Docx2txtLoader,
+    UnstructuredEPubLoader,
+)
+
+
+def is_text_based_pdf(path: str) -> bool:
+    """
+    Проверяет, есть ли в PDF реальный текст, а не только сканы.
+    Возвращает True, если найден хотя бы один непустой текстовый фрагмент.
+    """
+    try:
+        reader = PdfReader(path)
+        for page in reader.pages:
+            text = page.extract_text()
+            if text and text.strip():
+                return True
+        return False
+    except Exception:
+        # если PDF битый или PyPDF2 не смог распарсить — считаем сканом
+        return False
+
+
 def load_docs(path: str):
     p = Path(path)
     suffix = p.suffix.lower()
 
     if suffix == ".pdf":
-        from langchain_community.document_loaders import PyPDFLoader
-        docs = PyPDFLoader(str(p)).load()
+        if is_text_based_pdf(str(p)):
+            docs = PyPDFLoader(str(p)).load()
+        else:
+            # OCR-стратегия для сканов
+            docs = UnstructuredPDFLoader(str(p), strategy="ocr").load()
+
     elif suffix in {".txt", ".md"}:
-        from langchain_community.document_loaders import TextLoader
         docs = TextLoader(str(p), encoding="utf-8").load()
         for d in docs:
             d.metadata.setdefault("page", 1)
+
     elif suffix == ".docx":
-        from langchain_community.document_loaders import Docx2txtLoader
         docs = Docx2txtLoader(str(p)).load()
         for d in docs:
             d.metadata.setdefault("page", 1)
+
     elif suffix == ".epub":
-        from langchain_community.document_loaders import UnstructuredEPubLoader
         docs = UnstructuredEPubLoader(str(p)).load()
         for i, d in enumerate(docs, 1):
             d.metadata.setdefault("page", i)
+
     else:
         raise ValueError(f"Неизвестный формат: {suffix}")
 
+    # общие метаданные
     for d in docs:
         d.metadata.setdefault("source", str(p))
         d.metadata.setdefault("title", p.stem)
+
     return docs
 
 
@@ -40,8 +74,9 @@ def load_title_only(meta: dict) -> list[Document]:
     Опциональные: author, id_book, year, lang, dept_code и т.п.
     """
     title = (meta.get("title") or "").strip()
+
     if not title:
-        raise ValueError("В meta должен быть хотя бы 'title'")
+        title = meta.get("author")
 
     author = (meta.get("author") or "").strip()
     content = f"{author}. {title}" if author else title
@@ -56,6 +91,7 @@ def load_title_only(meta: dict) -> list[Document]:
         "has_text": False,       # признак, что текста нет
     }
 
+    print("META:", metadata)
     # добавляем все остальные поля, что передали
     for k, v in meta.items():
         metadata.setdefault(k, v)

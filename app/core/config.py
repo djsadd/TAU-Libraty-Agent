@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "book_tau_e5"
 
     E5_MODEL_NAME: str = "intfloat/multilingual-e5-large-instruct"
-    E5_DEVICE: str = "cpu"
+    E5_DEVICE: str = "cuda"
 
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 150

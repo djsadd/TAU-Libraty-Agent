@@ -17,6 +17,7 @@ from PIL import Image
 # Опционально для DOCX/EPUB
 from docx import Document as DocxDocument
 from ebooklib import epub
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # ---------- Метрики текста ----------
 def basic_text_metrics(text: str) -> dict:
@@ -91,6 +92,7 @@ class PDFTextStats:
     sample_ocr_avg_conf: Optional[float]
     sample_ocr_bad_frac: Optional[float]
     verdict: str
+
 
 def pdf_extract_text_stats(path: str, sample_pages_for_ocr: int = 6) -> PDFTextStats:
     doc = fitz.open(path)

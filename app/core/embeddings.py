@@ -28,5 +28,5 @@ class E5InstructEmbeddings(Embeddings):
 
 # глобальные синглтоны для экономии времени/памяти
 
-st_model = SentenceTransformer(settings.E5_MODEL_NAME, device=settings.E5_DEVICE)
+st_model = SentenceTransformer(settings.E5_MODEL_NAME, device="cuda")
 embeddings = E5InstructEmbeddings(st_model=st_model, batch_size=32, max_length=512)

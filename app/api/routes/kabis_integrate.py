@@ -7,16 +7,20 @@ from sqlalchemy import select, func
 from app.models.kabis import Kabis
 from kabisapi.read_kabis import parse_payload, flatten_copies
 from app.core.config import settings
+from io import BytesIO
 
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from typing import List, Dict
-
+from app.core.book_quality_check import check_file
 from app.core.db import SessionLocal
 from app.models.job import Job, JobStatus
 from app.models.books import Document
-from ...worker import ingest_job  # импорт актёра
+from ...worker import ingest_job, ingest_job_book  # импорт актёра
 import uuid
+import os
+import requests
+from pathlib import Path
 
 
 def save_kabis_rows(session: Session, rows: list[dict]):
@@ -53,7 +57,7 @@ def save_kabis_rows(session: Session, rows: list[dict]):
     session.commit()
 
 
-router = APIRouter(prefix="/api", tags=["upload_kabis", "index_kabis_books"])
+router = APIRouter(prefix="/api", tags=["upload_kabis", "index_kabis_books", "index_kabis_file_books"])
 
 
 @router.get("/upload_kabis", summary="Загрузка данных в Kabis",
@@ -110,7 +114,6 @@ async def kabis_index():
         rows = session.scalars(stmt).all()
         for row in rows:
             row_dict = {k: v for k, v in row.__dict__.items() if not k.startswith("_")}
-            print(row_dict)
             document_id = str(uuid.uuid4())
 
             db = SessionLocal()
@@ -126,3 +129,86 @@ async def kabis_index():
             ingest_job.send(job.id, meta=row_dict)
             db.commit()
     return {"Hello": "World"}
+
+
+@router.get("/index_kabis_file_books", summary="Индексирование библиотеки КАБИС",
+             description="Индексирование библиотеки кабис")
+async def index_kabis_file_books():
+    path_url = "https://kabis.tau-edu.kz"   # лучше явно https://
+    save_dir = Path("uploads")            # папка куда сохраняем файлы
+    save_dir.mkdir(exist_ok=True)
+
+    file_paths = []
+
+    with SessionLocal() as session:
+        stmt = (
+            select(Kabis)
+            .where(
+                Kabis.file_is_index.is_(False),
+                Kabis.download_url.isnot(None)
+            )
+        )
+        rows = session.scalars(stmt).all()
+
+        for row in rows:
+            url = f"{path_url}{row.download_url}"
+            filename = os.path.basename(row.download_url)
+            save_path = save_dir / filename
+
+            try:
+                # скачиваем
+                resp = requests.get(url, timeout=30)
+                resp.raise_for_status()
+            except requests.RequestException as e:
+                print(f"⚠️ Ошибка скачивания {url}: {e}, пропускаем...")
+                continue  # идём к следующей книге
+
+            # пишем на диск
+            with open(save_path, "wb") as f:
+                f.write(resp.content)
+
+            print(f"✅ Saved {url} -> {save_path}")
+            file_paths.append(str(save_path))
+
+            # создаём "file" как будто это загруженный файл
+            file = BytesIO(resp.content)
+
+            # проверка читаемости документа
+            book_quality = check_file(save_path)
+            if book_quality["verdict"] not in ("OK_TEXT", "OK_TEXT_PDF", "OK_OCR"):
+                print(f"⚠️ Документ {filename} не читаемый, пропускаем...")
+                continue
+
+            document_id = str(uuid.uuid4())
+
+            # 2) создаём документ
+            db_doc = SessionLocal()
+            doc = Document(
+                title=filename,
+                file_path=str(save_path),
+                file_type=filename.split(".")[-1].lower(),
+            )
+
+            db_doc.add(doc)
+            db_doc.commit()
+            db_doc.refresh(doc)
+            db = SessionLocal()
+
+            # 3) создать Job в БД
+            job = Job(document_id=document_id, status=JobStatus.queued)
+            db.add(job)
+            db.commit()
+            db.refresh(job)
+            db.close()
+
+            # 4) поставить в очередь
+            ingest_job.send(job.id, str(filename))
+            doc.file_is_index = True
+            db.commit()
+
+            # Закрыть
+            db_doc.refresh(doc)
+            db_doc.close()
+            db_doc.commit()
+            # 5) ответить клиенту
+        return {"document_id": document_id, "job_id": job.id, "status": "queued"}

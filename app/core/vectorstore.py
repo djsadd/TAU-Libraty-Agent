@@ -37,3 +37,7 @@ def index_documents(docs):
 
 def get_retriever(k: int | None = None):
     return vectorstore.as_retriever(search_kwargs={"k": k or settings.TOP_K})
+
+
+def get_book_retriever(k: int | None = None):
+    return vectorstore.as_retriever(search_kwargs={"k": k or settings.TOP_K})

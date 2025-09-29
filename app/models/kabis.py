@@ -30,3 +30,4 @@ class Kabis(Base):
     is_indexed = Column(Boolean, default=False)
     file_path = Column(String, nullable=True)          # путь к файлу в хранилище
     file_type = Column(String, nullable=True)           # pdf | docx | txt | ...
+    file_is_index = Column(Boolean, default=False)
