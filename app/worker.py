@@ -33,7 +33,7 @@ def update_job(db, job_id, **fields):
 
 
 # === tasks ===
-@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)  # retry каждые 30 сек
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=30, queue="default")
 def ingest_job(self, job_id: str, filename: str | None = None, meta: dict | None = None):
     db = SessionLocal()
     try:
@@ -74,50 +74,5 @@ def ingest_job(self, job_id: str, filename: str | None = None, meta: dict | None
                    error_message=str(exc),
                    finished_at=datetime.utcnow())
         raise self.retry(exc=exc)   # Celery retry
-    finally:
-        db.close()
-
-
-@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
-def ingest_job_book(self, job_id: str, filename: str | None = None, meta: dict | None = None):
-    db = SessionLocal()
-    try:
-        update_job(db, job_id,
-                   status=JobStatus.processing,
-                   current_step="start",
-                   progress_pct=1,
-                   started_at=datetime.utcnow())
-
-        # === extract ===
-        update_job(db, job_id, current_step="extract", progress_pct=10)
-        docs = load_docs(Path(filename)) if filename else load_title_only(meta)
-
-        # === chunk ===
-        update_job(db, job_id, current_step="chunk", progress_pct=40)
-        index_documents(docs)
-
-        # === embed ===
-        update_job(db, job_id, current_step="embed", progress_pct=70)
-
-        # === index ===
-        update_job(db, job_id, current_step="index", progress_pct=90)
-        if meta and meta.get("id_book"):
-            book = db.query(Kabis).filter(Kabis.id_book == str(meta["id_book"])).first()
-            if book:
-                book.is_indexed = True
-                db.commit()
-
-        update_job(db, job_id,
-                   status=JobStatus.succeeded,
-                   current_step="done",
-                   progress_pct=100,
-                   finished_at=datetime.utcnow())
-    except Exception as exc:
-        update_job(db, job_id,
-                   status=JobStatus.failed,
-                   current_step="error",
-                   error_message=str(exc),
-                   finished_at=datetime.utcnow())
-        raise self.retry(exc=exc)
     finally:
         db.close()

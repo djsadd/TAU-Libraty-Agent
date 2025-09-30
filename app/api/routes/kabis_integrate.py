@@ -16,7 +16,7 @@ from app.core.book_quality_check import check_file
 from app.core.db import SessionLocal
 from app.models.job import Job, JobStatus
 from app.models.books import Document
-from ...worker import ingest_job, ingest_job_book  # импорт актёра
+from app.worker import ingest_job
 import uuid
 import os
 import requests
@@ -126,7 +126,7 @@ async def kabis_index():
             db.close()
 
             # 4) поставить в очередь
-            ingest_job.send(job.id, meta=row_dict)
+            ingest_job.delay(job.id, meta=row_dict)
             db.commit()
     return {"Hello": "World"}
 
@@ -209,7 +209,7 @@ async def index_kabis_file_books():
             db.close()
 
             # 4) поставить в очередь
-            ingest_job.send(job.id, str(filename))
+            ingest_job.delay(job.id, str(filename))
             doc.file_is_index = True
             db.commit()
 

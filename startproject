@@ -4,4 +4,10 @@
 # dramatiq app.worker:broker -p 2 -t 1
 # python run_dashboard.py # http://127.0.0.1:9199/
 # npm run preview
-#
+# celery -A app.worker flower --port=5555
+# celery -A app.worker worker --loglevel=INFO -Q default -c 1 -P gevent
+
+# pip install tokenizers
+# pip install torch==2.4.0+cu118 torchvision==0.19.0+cu118 torchaudio==2.4.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+# pip install tinycss2
+# install tesseract
