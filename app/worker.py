@@ -1,19 +1,30 @@
 # worker.py
-import dramatiq
-from dramatiq.brokers.redis import RedisBroker
 from datetime import datetime
+from pathlib import Path
+
+from celery import Celery
 from app.core.db import SessionLocal
 from app.core.loaders import load_docs, load_title_only
 from app.core.vectorstore import index_documents
 from app.models.job import Job, JobStatus
-from pathlib import Path
-from .core.config import settings
 from app.models.kabis import Kabis
-# 1) подключаем Redis
-broker = RedisBroker(host="localhost", port=6379, db=0)
-dramatiq.set_broker(broker)
+from app.core.config import settings
+
+# === Celery init ===
+celery_app = Celery(
+    "worker",
+    broker="redis://localhost:6379/0",
+    backend="redis://localhost:6379/1",
+)
+
+celery_app.conf.update(
+    task_track_started=True,
+    task_time_limit=60 * 60,   # максимум 1 час
+    result_expires=3600,       # хранить результаты 1 час
+)
 
 
+# === helpers ===
 def update_job(db, job_id, **fields):
     job = db.get(Job, job_id)
     for k, v in fields.items():
@@ -21,56 +32,9 @@ def update_job(db, job_id, **fields):
     db.commit()
 
 
-@dramatiq.actor(max_retries=5, min_backoff=30000)  # 30s, 2m, 10m...
-def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = None):
-    if not filename:
-        db = SessionLocal()
-        try:
-            update_job(db, job_id,
-                       status=JobStatus.processing,
-                       current_step="start",
-                       progress_pct=1,
-                       started_at=datetime.utcnow())
-
-            # === extract ===
-            update_job(db, job_id, current_step="extract", progress_pct=10)
-            # ... твоя логика извлечения текста ...
-            docs = load_title_only(meta)
-
-            # === chunk ===
-            update_job(db, job_id, current_step="chunk", progress_pct=40)
-            # ... чанкование ...
-            index_documents(docs)
-
-            # === embed ===
-            update_job(db, job_id, current_step="embed", progress_pct=70)
-            # ... эмбеддинги ...
-
-            # === index ===
-            update_job(db, job_id, current_step="index", progress_pct=90)
-            # ... запись в Qdrant ...
-            if meta and meta.get("id_book"):
-                book = db.query(Kabis).filter(Kabis.id_book == str(meta["id_book"])).first()
-                if book:
-                    book.is_indexed = True
-                    db.commit()
-            update_job(db, job_id,
-                       status=JobStatus.succeeded,
-                       current_step="done",
-                       progress_pct=100,
-                       finished_at=datetime.utcnow())
-        except Exception as e:
-            update_job(db, job_id,
-                       status=JobStatus.failed,
-                       current_step="error",
-                       error_message=str(e),
-                       finished_at=datetime.utcnow())
-        finally:
-            db.close()
-        return
-
-    save_path = Path(settings.UPLOAD_DIR) / filename
-
+# === tasks ===
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)  # retry каждые 30 сек
+def ingest_job(self, job_id: str, filename: str | None = None, meta: dict | None = None):
     db = SessionLocal()
     try:
         update_job(db, job_id,
@@ -81,88 +45,41 @@ def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = Non
 
         # === extract ===
         update_job(db, job_id, current_step="extract", progress_pct=10)
-        # ... твоя логика извлечения текста ...
-        docs = load_docs(save_path)
-        # нормализация метаданных
+        docs = load_docs(Path(settings.UPLOAD_DIR) / filename) if filename else load_title_only(meta)
 
         # === chunk ===
         update_job(db, job_id, current_step="chunk", progress_pct=40)
-        # ... чанкование ...
         index_documents(docs)
 
         # === embed ===
         update_job(db, job_id, current_step="embed", progress_pct=70)
-        # ... эмбеддинги ...
 
         # === index ===
         update_job(db, job_id, current_step="index", progress_pct=90)
-        # ... запись в Qdrant ...
+        if meta and meta.get("id_book"):
+            book = db.query(Kabis).filter(Kabis.id_book == str(meta["id_book"])).first()
+            if book:
+                book.is_indexed = True
+                db.commit()
 
         update_job(db, job_id,
                    status=JobStatus.succeeded,
                    current_step="done",
                    progress_pct=100,
                    finished_at=datetime.utcnow())
-    except Exception as e:
+    except Exception as exc:
         update_job(db, job_id,
                    status=JobStatus.failed,
                    current_step="error",
-                   error_message=str(e),
+                   error_message=str(exc),
                    finished_at=datetime.utcnow())
+        raise self.retry(exc=exc)   # Celery retry
     finally:
         db.close()
 
 
-@dramatiq.actor(max_retries=5, min_backoff=30000)  # 30s, 2m, 10m...
-def ingest_job_book(job_id: str, filename: str | None = None, meta: dict | None = None):
-    if not filename:
-        db = SessionLocal()
-        try:
-            update_job(db, job_id,
-                       status=JobStatus.processing,
-                       current_step="start",
-                       progress_pct=1,
-                       started_at=datetime.utcnow())
-
-            # === extract ===
-            update_job(db, job_id, current_step="extract", progress_pct=10)
-            # ... твоя логика извлечения текста ...
-            docs = load_title_only(meta)
-
-            # === chunk ===
-            update_job(db, job_id, current_step="chunk", progress_pct=40)
-            # ... чанкование ...
-            index_documents(docs)
-
-            # === embed ===
-            update_job(db, job_id, current_step="embed", progress_pct=70)
-            # ... эмбеддинги ...
-
-            # === index ===
-            update_job(db, job_id, current_step="index", progress_pct=90)
-            # ... запись в Qdrant ...
-            if meta and meta.get("id_book"):
-                book = db.query(Kabis).filter(Kabis.id_book == str(meta["id_book"])).first()
-                if book:
-                    book.is_indexed = True
-                    db.commit()
-            update_job(db, job_id,
-                       status=JobStatus.succeeded,
-                       current_step="done",
-                       progress_pct=100,
-                       finished_at=datetime.utcnow())
-        except Exception as e:
-            update_job(db, job_id,
-                       status=JobStatus.failed,
-                       current_step="error",
-                       error_message=str(e),
-                       finished_at=datetime.utcnow())
-        finally:
-            db.close()
-        return
-
-    save_path = filename
-
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
+def ingest_job_book(self, job_id: str, filename: str | None = None, meta: dict | None = None):
     db = SessionLocal()
     try:
         update_job(db, job_id,
@@ -173,33 +90,34 @@ def ingest_job_book(job_id: str, filename: str | None = None, meta: dict | None 
 
         # === extract ===
         update_job(db, job_id, current_step="extract", progress_pct=10)
-        # ... твоя логика извлечения текста ...
-        docs = load_docs(save_path)
-        # нормализация метаданных
+        docs = load_docs(Path(filename)) if filename else load_title_only(meta)
 
         # === chunk ===
         update_job(db, job_id, current_step="chunk", progress_pct=40)
-        # ... чанкование ...
         index_documents(docs)
 
         # === embed ===
         update_job(db, job_id, current_step="embed", progress_pct=70)
-        # ... эмбеддинги ...
 
         # === index ===
         update_job(db, job_id, current_step="index", progress_pct=90)
-        # ... запись в Qdrant ...
+        if meta and meta.get("id_book"):
+            book = db.query(Kabis).filter(Kabis.id_book == str(meta["id_book"])).first()
+            if book:
+                book.is_indexed = True
+                db.commit()
 
         update_job(db, job_id,
                    status=JobStatus.succeeded,
                    current_step="done",
                    progress_pct=100,
                    finished_at=datetime.utcnow())
-    except Exception as e:
+    except Exception as exc:
         update_job(db, job_id,
                    status=JobStatus.failed,
                    current_step="error",
-                   error_message=str(e),
+                   error_message=str(exc),
                    finished_at=datetime.utcnow())
+        raise self.retry(exc=exc)
     finally:
         db.close()
