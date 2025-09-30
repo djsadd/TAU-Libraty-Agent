@@ -20,11 +20,11 @@ def _format_docs(docs, per_chunk_chars=800, max_chunks=5):
     for d in docs[:max_chunks]:
         m = d.metadata or {}
         title = m.get("title", "книга")
-        author = m.get("author", "неизвестен")
-        subject = m.get("subject")
+        # author = m.get("author", "неизвестен")
+        # subject = m.get("subject")
         page = m.get("page", "?")
         text = (d.page_content or "")[:per_chunk_chars].strip()
-        lines.append(f"[{title}, автор: {author}, стр. {page}] {text}, Дополнительная информация - {subject}")
+        lines.append(f"[{title}, стр. {page}] {text}")
     print("\n\n".join(lines))
     return "\n\n".join(lines)
 
