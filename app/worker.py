@@ -9,6 +9,8 @@ from app.core.vectorstore import index_documents
 from app.models.job import Job, JobStatus
 from app.models.kabis import Kabis
 from app.core.config import settings
+from typing import List, Dict
+
 
 # === Celery init ===
 celery_app = Celery(
@@ -74,5 +76,66 @@ def ingest_job(self, job_id: str, filename: str | None = None, meta: dict | None
                    error_message=str(exc),
                    finished_at=datetime.utcnow())
         raise self.retry(exc=exc)   # Celery retry
+    finally:
+        db.close()
+
+
+# === tasks ===
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=30, queue="default")
+def ingest_job_batch(self, jobs: List[Dict]):
+    """
+    jobs = [
+        {"job_id": "uuid1", "filename": "file1.pdf", "meta": {...}},
+        {"job_id": "uuid2", "filename": None, "meta": {...}},
+        ...
+    ]
+    """
+    db = SessionLocal()
+    try:
+        for job_info in jobs:
+            job_id = job_info["job_id"]
+            filename = job_info.get("filename")
+            meta = job_info.get("meta")
+
+            update_job(db, job_id,
+                       status=JobStatus.processing,
+                       current_step="start",
+                       progress_pct=1,
+                       started_at=datetime.utcnow())
+
+            # === extract ===
+            update_job(db, job_id, current_step="extract", progress_pct=10)
+            docs = load_docs(Path(settings.UPLOAD_DIR) / filename) if filename else load_title_only(meta)
+
+            # === chunk ===
+            update_job(db, job_id, current_step="chunk", progress_pct=40)
+            index_documents(docs)
+
+            # === embed ===
+            update_job(db, job_id, current_step="embed", progress_pct=70)
+
+            # === index ===
+            update_job(db, job_id, current_step="index", progress_pct=90)
+            if meta and meta.get("id_book"):
+                book = db.query(Kabis).filter(Kabis.id_book == str(meta["id_book"])).first()
+                if book:
+                    book.is_indexed = True
+                    db.commit()
+
+            update_job(db, job_id,
+                       status=JobStatus.succeeded,
+                       current_step="done",
+                       progress_pct=100,
+                       finished_at=datetime.utcnow())
+
+    except Exception as exc:
+        # В случае ошибки помечаем все jobs как failed
+        for job_info in jobs:
+            update_job(db, job_info["job_id"],
+                       status=JobStatus.failed,
+                       current_step="error",
+                       error_message=str(exc),
+                       finished_at=datetime.utcnow())
+        raise self.retry(exc=exc)
     finally:
         db.close()

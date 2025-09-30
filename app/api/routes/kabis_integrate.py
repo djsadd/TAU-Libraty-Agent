@@ -129,13 +129,11 @@ async def kabis_index():
             ingest_job.delay(job.id, meta=row_dict)
             db.commit()
     return {"Hello": "World"}
-
-
 @router.get("/index_kabis_file_books", summary="Индексирование библиотеки КАБИС",
              description="Индексирование библиотеки кабис")
-async def index_kabis_file_books():
-    path_url = "https://kabis.tau-edu.kz"   # лучше явно https://
-    save_dir = Path("uploads")            # папка куда сохраняем файлы
+async def index_kabis_file_books(batch_size: int = 10):
+    path_url = "https://kabis.tau-edu.kz"
+    save_dir = Path("uploads")
     save_dir.mkdir(exist_ok=True)
 
     file_paths = []
@@ -150,30 +148,25 @@ async def index_kabis_file_books():
         )
         rows = session.scalars(stmt).all()
 
+        batch_jobs = []
+
         for row in rows:
             url = f"{path_url}{row.download_url}"
             filename = os.path.basename(row.download_url)
             save_path = save_dir / filename
 
             try:
-                # скачиваем
                 resp = requests.get(url, timeout=30)
                 resp.raise_for_status()
             except requests.RequestException as e:
                 print(f"⚠️ Ошибка скачивания {url}: {e}, пропускаем...")
-                continue  # идём к следующей книге
+                continue
 
-            # пишем на диск
             with open(save_path, "wb") as f:
                 f.write(resp.content)
-
             print(f"✅ Saved {url} -> {save_path}")
             file_paths.append(str(save_path))
 
-            # создаём "file" как будто это загруженный файл
-            file = BytesIO(resp.content)
-
-            # проверка читаемости документа
             book_quality = check_file(save_path)
             if book_quality["verdict"] not in ("OK_TEXT", "OK_TEXT_PDF", "OK_OCR"):
                 print(f"⚠️ Документ {filename} не читаемый, пропускаем...")
@@ -181,41 +174,42 @@ async def index_kabis_file_books():
 
             document_id = str(uuid.uuid4())
 
-            # 2) создаём документ
-            db_doc = SessionLocal()
-            if not row.title:
-                doc = Document(
-                    title=row.author,
-                    file_path=str(save_path),
-                    file_type=filename.split(".")[-1].lower(),
-                )
-            else:
-                doc = Document(
-                    title=row.title,
-                    file_path=str(save_path),
-                    file_type=filename.split(".")[-1].lower(),
-                )
+            # Создаем Document
+            doc = Document(
+                title=row.title or row.author,
+                file_path=str(save_path),
+                file_type=filename.split(".")[-1].lower()
+            )
+            session.add(doc)
 
-            db_doc.add(doc)
-            db_doc.commit()
-            db_doc.refresh(doc)
-            db = SessionLocal()
+            # Сразу ставим file_is_index для Kabis
+            row.file_is_index = True
 
-            # 3) создать Job в БД
+            session.commit()
+            session.refresh(doc)
+
+            # Создаем Job
             job = Job(document_id=document_id, status=JobStatus.queued)
-            db.add(job)
-            db.commit()
-            db.refresh(job)
-            db.close()
+            session.add(job)
+            session.commit()
+            session.refresh(job)
 
-            # 4) поставить в очередь
-            ingest_job.delay(job.id, str(filename))
-            doc.file_is_index = True
-            db.commit()
+            # Добавляем в батч для Celery
+            batch_jobs.append({
+                "job_id": job.id,
+                "filename": str(save_path),
+                "meta": None  # или сюда можно вставить meta=row_dict если нужно
+            })
 
-            # Закрыть
-            db_doc.refresh(doc)
-            db_doc.close()
-            db_doc.commit()
-            # 5) ответить клиенту
-        return {"document_id": document_id, "job_id": job.id, "status": "queued"}
+            # Отправляем батч, если набрали batch_size
+            if len(batch_jobs) >= batch_size:
+                from app.worker import ingest_job_batch
+                ingest_job_batch.delay(batch_jobs)
+                batch_jobs = []
+
+        # Если остались jobs в конце списка, отправляем их
+        if batch_jobs:
+            from app.worker import ingest_job_batch
+            ingest_job_batch.delay(batch_jobs)
+
+    return {"total_files": len(file_paths), "status": "queued"}
