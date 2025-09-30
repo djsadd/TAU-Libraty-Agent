@@ -66,8 +66,14 @@ def read_txt(path: str) -> str:
     return fix_text(text)
 
 def read_docx(path: str) -> str:
-    doc = DocxDocument(path)
-    return "\n".join(p.text for p in doc.paragraphs)
+    try:
+        doc = DocxDocument(path)
+        return "\n".join(p.text for p in doc.paragraphs)
+    except Exception as e:
+        # Если это не настоящий DOCX или файл битый
+        print(f"[WARN] read_docx: {path} не удалось прочитать ({e})")
+        return ""
+
 
 def read_epub(path: str) -> str:
     book = epub.read_epub(path)

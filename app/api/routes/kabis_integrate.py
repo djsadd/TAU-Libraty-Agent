@@ -183,11 +183,18 @@ async def index_kabis_file_books():
 
             # 2) создаём документ
             db_doc = SessionLocal()
-            doc = Document(
-                title=filename,
-                file_path=str(save_path),
-                file_type=filename.split(".")[-1].lower(),
-            )
+            if not row.title:
+                doc = Document(
+                    title=row.author,
+                    file_path=str(save_path),
+                    file_type=filename.split(".")[-1].lower(),
+                )
+            else:
+                doc = Document(
+                    title=row.title,
+                    file_path=str(save_path),
+                    file_type=filename.split(".")[-1].lower(),
+                )
 
             db_doc.add(doc)
             db_doc.commit()
