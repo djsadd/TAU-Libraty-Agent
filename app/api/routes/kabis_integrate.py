@@ -129,6 +129,8 @@ async def kabis_index():
             ingest_job.delay(job.id, meta=row_dict)
             db.commit()
     return {"Hello": "World"}
+
+    
 @router.get("/index_kabis_file_books", summary="Индексирование библиотеки КАБИС",
              description="Индексирование библиотеки кабис")
 async def index_kabis_file_books(batch_size: int = 10):
