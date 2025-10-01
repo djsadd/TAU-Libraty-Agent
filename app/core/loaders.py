@@ -1,8 +1,6 @@
 from pathlib import Path
 from langchain.schema import Document
 
-
-from pathlib import Path
 from PyPDF2 import PdfReader
 from langchain_community.document_loaders import (
     PyPDFLoader,
@@ -11,6 +9,9 @@ from langchain_community.document_loaders import (
     Docx2txtLoader,
     UnstructuredEPubLoader,
 )
+
+
+POPLER_PATH = r"C:\poppler-25.07.0\Library\bin"
 
 
 def is_text_based_pdf(path: str) -> bool:
@@ -29,7 +30,6 @@ def is_text_based_pdf(path: str) -> bool:
         # если PDF битый или PyPDF2 не смог распарсить — считаем сканом
         return False
 
-
 def load_docs(path: str):
     p = Path(path)
     suffix = p.suffix.lower()
@@ -38,7 +38,7 @@ def load_docs(path: str):
         if is_text_based_pdf(str(p)):
             docs = PyPDFLoader(str(p)).load()
         else:
-            # OCR-стратегия для сканов
+            # OCR-стратегия для сканов с указанием poppler_path
             docs = UnstructuredPDFLoader(str(p), strategy="ocr").load()
 
     elif suffix in {".txt", ".md"}:
@@ -98,4 +98,3 @@ def load_title_only(meta: dict) -> list[Document]:
 
     doc = Document(page_content=content, metadata=metadata)
     return [doc]
-

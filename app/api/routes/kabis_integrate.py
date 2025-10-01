@@ -209,7 +209,7 @@ async def index_kabis_file_books():
             db.close()
 
             # 4) поставить в очередь
-            ingest_job.send(job.id, str(filename))
+            ingest_job(job.id, str(filename))
             doc.file_is_index = True
             db.commit()
 
@@ -218,4 +218,5 @@ async def index_kabis_file_books():
             db_doc.close()
             db_doc.commit()
             # 5) ответить клиенту
+            break
         return {"document_id": document_id, "job_id": job.id, "status": "queued"}

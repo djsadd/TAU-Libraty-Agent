@@ -25,8 +25,6 @@ class E5InstructEmbeddings(Embeddings):
         vec = self.st.encode([q], batch_size=1, normalize_embeddings=False, show_progress_bar=False)
         return self._l2_normalize(np.asarray(vec))[0].tolist()
 
-
 # глобальные синглтоны для экономии времени/памяти
-
-st_model = SentenceTransformer(settings.E5_MODEL_NAME, device="cuda")
-embeddings = E5InstructEmbeddings(st_model=st_model, batch_size=128, max_length=512)
+st_model = SentenceTransformer(settings.E5_MODEL_NAME, device=settings.E5_DEVICE)
+embeddings = E5InstructEmbeddings(st_model=st_model, batch_size=32, max_length=512)
