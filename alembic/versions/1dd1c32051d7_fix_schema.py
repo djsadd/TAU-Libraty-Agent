@@ -1,8 +1,8 @@
-"""baseline
+"""fix schema
 
-Revision ID: 956b7f5e4a94
+Revision ID: 1dd1c32051d7
 Revises: 
-Create Date: 2025-09-23 18:04:11.883562
+Create Date: 2025-10-02 15:16:02.282228
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '956b7f5e4a94'
+revision: str = '1dd1c32051d7'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -31,7 +31,7 @@ def upgrade() -> None:
     sa.Column('owner', sa.String(), nullable=True),
     sa.Column('is_enabled', sa.Boolean(), nullable=True),
     sa.Column('is_indexed', sa.Boolean(), nullable=True),
-    sa.Column('uploaded_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.Column('uploaded_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
@@ -42,7 +42,7 @@ def upgrade() -> None:
     sa.Column('current_step', sa.String(), nullable=True),
     sa.Column('progress_pct', sa.Integer(), nullable=False),
     sa.Column('error_message', sa.Text(), nullable=True),
-    sa.Column('queued_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
+    sa.Column('queued_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
     sa.Column('started_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id')
@@ -70,6 +70,7 @@ def upgrade() -> None:
     sa.Column('is_indexed', sa.Boolean(), nullable=True),
     sa.Column('file_path', sa.String(), nullable=True),
     sa.Column('file_type', sa.String(), nullable=True),
+    sa.Column('file_is_index', sa.Boolean(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###

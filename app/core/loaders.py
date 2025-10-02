@@ -9,6 +9,7 @@ from langchain_community.document_loaders import (
     Docx2txtLoader,
     UnstructuredEPubLoader,
 )
+from typing import Optional
 
 
 POPLER_PATH = r"C:\poppler-25.07.0\Library\bin"
@@ -30,7 +31,8 @@ def is_text_based_pdf(path: str) -> bool:
         # если PDF битый или PyPDF2 не смог распарсить — считаем сканом
         return False
 
-def load_docs(path: str):
+
+def load_docs(path: str, meta: Optional[dict] = None):
     p = Path(path)
     suffix = p.suffix.lower()
 
@@ -62,8 +64,10 @@ def load_docs(path: str):
     # общие метаданные
     for d in docs:
         d.metadata.setdefault("source", str(p))
-        d.metadata.setdefault("title", p.stem)
-
+        if meta["title"]:
+            d.metadata.setdefault("title", meta["title"])
+        else:
+            d.metadata.setdefault("title", p.stem)
     return docs
 
 

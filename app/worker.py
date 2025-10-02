@@ -7,6 +7,7 @@ from app.core.loaders import load_docs, load_title_only
 from app.core.vectorstore import index_documents
 from app.models.job import Job, JobStatus
 from pathlib import Path
+from app.models.books import Document
 from .core.config import settings
 from app.models.kabis import Kabis
 # 1) подключаем Redis
@@ -54,6 +55,7 @@ def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = Non
                 if book:
                     book.is_indexed = True
                     db.commit()
+
             update_job(db, job_id,
                        status=JobStatus.succeeded,
                        current_step="done",
@@ -82,7 +84,11 @@ def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = Non
         # === extract ===
         update_job(db, job_id, current_step="extract", progress_pct=10)
         # ... твоя логика извлечения текста ...
-        docs = load_docs(save_path)
+        if meta:
+            docs = load_docs(save_path, meta)
+        else:
+            docs = load_docs(save_path)
+
         # нормализация метаданных
 
         # === chunk ===
@@ -97,12 +103,24 @@ def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = Non
         # === index ===
         update_job(db, job_id, current_step="index", progress_pct=90)
         # ... запись в Qdrant ...
+        if meta and meta.get("id_book"):
+            book = db.query(Kabis).filter(Kabis.id_book == str(meta["id_book"])).first()
+            if book:
+                book.file_is_index = True
+
+                document = db.query(Document).filter(Document.kabis_id == str(meta["id_book"])).first()
+                if document:
+                    document.is_indexed = True
+
+                db.commit()  # сохраняем все изменения разом
 
         update_job(db, job_id,
                    status=JobStatus.succeeded,
                    current_step="done",
                    progress_pct=100,
                    finished_at=datetime.utcnow())
+
+
     except Exception as e:
         update_job(db, job_id,
                    status=JobStatus.failed,

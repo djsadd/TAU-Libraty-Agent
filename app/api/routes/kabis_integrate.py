@@ -138,8 +138,6 @@ async def index_kabis_file_books():
     save_dir = Path("uploads")            # папка куда сохраняем файлы
     save_dir.mkdir(exist_ok=True)
 
-    file_paths = []
-
     with SessionLocal() as session:
         stmt = (
             select(Kabis)
@@ -156,24 +154,18 @@ async def index_kabis_file_books():
             save_path = save_dir / filename
 
             try:
-                # скачиваем
                 resp = requests.get(url, timeout=30)
                 resp.raise_for_status()
             except requests.RequestException as e:
                 print(f"⚠️ Ошибка скачивания {url}: {e}, пропускаем...")
-                continue  # идём к следующей книге
+                continue
 
-            # пишем на диск
             with open(save_path, "wb") as f:
                 f.write(resp.content)
 
             print(f"✅ Saved {url} -> {save_path}")
-            file_paths.append(str(save_path))
 
-            # создаём "file" как будто это загруженный файл
-            file = BytesIO(resp.content)
-
-            # проверка читаемости документа
+            # проверка читаемости
             book_quality = check_file(save_path)
             if book_quality["verdict"] not in ("OK_TEXT", "OK_TEXT_PDF", "OK_OCR"):
                 print(f"⚠️ Документ {filename} не читаемый, пропускаем...")
@@ -181,42 +173,28 @@ async def index_kabis_file_books():
 
             document_id = str(uuid.uuid4())
 
-            # 2) создаём документ
-            db_doc = SessionLocal()
-            if not row.title:
-                doc = Document(
-                    title=row.author,
-                    file_path=str(save_path),
-                    file_type=filename.split(".")[-1].lower(),
-                )
-            else:
-                doc = Document(
-                    title=row.title,
-                    file_path=str(save_path),
-                    file_type=filename.split(".")[-1].lower(),
-                )
+            # создаём документ
+            doc = Document(
+                title=row.title or row.author,
+                file_path=str(save_path),
+                file_type=filename.split(".")[-1].lower(),
+                kabis_id=row.id_book,
+            )
+            session.add(doc)
+            session.commit()
+            session.refresh(doc)
 
-            db_doc.add(doc)
-            db_doc.commit()
-            db_doc.refresh(doc)
-            db = SessionLocal()
-
-            # 3) создать Job в БД
+            # создаём Job
             job = Job(document_id=document_id, status=JobStatus.queued)
-            db.add(job)
-            db.commit()
-            db.refresh(job)
-            db.close()
+            session.add(job)
+            session.commit()
+            session.refresh(job)
 
-            # 4) поставить в очередь
-            ingest_job(job.id, str(filename))
-            doc.file_is_index = True
-            db.commit()
+            # ставим в очередь
+            ingest_job(job.id, str(filename), meta={"id_book": row.id_book, "title": row.title or row.author})
 
-            # Закрыть
-            db_doc.refresh(doc)
-            db_doc.close()
-            db_doc.commit()
-            # 5) ответить клиенту
-            break
-        return {"document_id": document_id, "job_id": job.id, "status": "queued"}
+            # вот здесь обновляем поле у row (Kabis)
+            row.file_is_index = True
+            session.commit()
+
+    return {"Hello": "World"}

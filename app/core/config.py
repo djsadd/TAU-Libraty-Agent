@@ -7,11 +7,15 @@ class Settings(BaseSettings):
     UPLOAD_DIR: Path = Path("uploads")
 
     GROQ_API_KEY: str
+    OPENAI_SECRET_KEY: str
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_COLLECTION: str = "book_tau_e5"
 
-    E5_MODEL_NAME: str = "intfloat/multilingual-e5-large-instruct"
-    E5_DEVICE: str = "cuda"
+    DB_NAME: str
+    DB_USERNAME: str
+    DB_PASSWORD: str
+    DB_PORT: str
+    DB_HOST: str
 
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 150

@@ -43,33 +43,31 @@ def vector_search(query: str, k: int = 5, retriever=None) -> str:
     return _format_docs(docs)
 
 
-def _format_books(docs, max_items=10):
+def _format_books(docs, max_items=None):
     lines = []
-    for d in docs[:max_items]:
+    limit = max_items or len(docs)   # если None → берем все
+    for d in docs[:limit]:
         m = d.metadata or {}
         title = m.get("title", "Неизвестная книга")
-        author = m.get("author", "Автор не указан")
-        year = m.get("year", "?")
         subject = m.get("subject", "Дополнительная информация")
 
-        # annotation = (d.page_content or "").strip()
-        # if len(annotation) > 300:
-        #     annotation = annotation[:300] + "..."
-        lines.append(f"📘 {title} — {author} ({year})\n, Дополнительная информация - {subject}")
+        lines.append(f"📘 {title}\nДоп. инфо: {subject}")
     return "\n\n".join(lines)
 
 
 @tool("book_search")
-def book_search(query: str, k: int = 5, retriever=None) -> str:
+def book_search(query: str, k: int = 50, retriever=None) -> str:
     """
-    Обзорный поиск по книгам (названия, авторы, аннотации).
-    Возвращает список релевантных книг.
+    Обзорный поиск по книгам (эмбеддинги).
+    Возвращает список релевантных книг (много).
     """
     print("Обзорный поиск")
     if retriever is None:
         return "Retriever для книг не подключён"
+
     docs = retriever.invoke(query, config={"k": k})
-    return _format_books(docs)
+    return _format_books(docs, max_items=k)
+
 
 
 @router.post("/chat", summary="Чат с ИИ")
@@ -81,25 +79,27 @@ async def chat(req: ChatRequest,
     try:
         # инструменты
         vs_tool = lambda q, k=5: vector_search.func(q, k, retriever=retriever)
-        # bs_tool = lambda q, k=5: book_search.func(q, k, retriever=book_retriever)
+        bs_tool = lambda q, k=30: book_search.func(q, k, retriever=book_retriever)
 
         prompt = ChatPromptTemplate.from_messages([
             ("system",
              "Ты помощник по поиску литературы в университете Туран-Астана. "
-             "Используй предоставленный контекст для ответа на вопросы студентов. "
-             "Если ответа нет — скажи об этом. "
+             "Используй предоставленный контекст и список книг для ответа на вопросы студентов. "
+             "Если ответа нет — скажи об этом. Ответы возвращай в html формате"
              "Книги доступны только во внутренней библиотеке университета."),
-            ("human", "Вопрос: {question}\n\nКонтекст:\n{context}")
+            ("human", "Вопрос: {question}\n\nКонтекст:\n{context}\n\nКниги:\n{books}")
         ])
 
         chain = (
                 RunnableParallel(
                     question=RunnablePassthrough(),
-                    context=lambda x: vs_tool(x, req.k or 5),
+                    context=lambda x: vs_tool(x, req.k or 5),  # поиск фрагментов
+                    books=lambda x: bs_tool(x, 30),  # поиск книг
                 )
                 | prompt
                 | llm
         )
+
         answer = chain.invoke(req.query)
         return {"reply": answer.content}
 
