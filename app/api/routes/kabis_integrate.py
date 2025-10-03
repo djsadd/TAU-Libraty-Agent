@@ -56,46 +56,42 @@ def save_kabis_rows(session: Session, rows: list[dict]):
 router = APIRouter(prefix="/api", tags=["upload_kabis", "index_kabis_books", "index_kabis_file_books"])
 
 
-@router.get("/upload_kabis", summary="Загрузка данных в Kabis",
-             description="Загрузка книг из базы данных Кабис в библиотеку ИИ агента.")
+# kabis_service.py
+def sync_kabis_upload():
+    token = get_token(settings.KABIS_USERNAME, settings.KABIS_PASSWORD)
+    books_count = api_get("/count_books", token).json()["Count book"][1]
+
+    with SessionLocal() as session:
+        count = session.scalar(select(func.count()).select_from(Kabis))
+        row = count
+
+        if row and row < books_count:
+            json_kabis = api_get(
+                "/get_books_range",
+                token,
+                params={"start_pos": int(row), "end_pos": int(books_count)}
+            ).json()
+            rows = parse_payload(json_kabis)
+            rows_flat = flatten_copies(rows)
+            save_kabis_rows(session, rows_flat)
+            return json_kabis
+        elif not row:
+            json_kabis = api_get(
+                "/get_books_range",
+                token,
+                params={"start_pos": 1, "end_pos": 100}
+            ).json()
+            rows = parse_payload(json_kabis)
+            rows_flat = flatten_copies(rows)
+            save_kabis_rows(session, rows_flat)
+            return rows_flat
+        return {"Count books": books_count}
+
+@router.get("/upload_kabis")
 async def kabis_upload():
     try:
-
-        token = get_token(settings.KABIS_USERNAME, settings.KABIS_PASSWORD)
-        books_count = api_get("/count_books", token).json()["Count book"][1]
-
-        with SessionLocal() as session:
-            count = session.scalar(
-                select(func.count()).select_from(Kabis)
-            )
-            row = count
-            if row:
-                if row < books_count:
-                    json_kabis = api_get(
-                        "/get_books_range",
-                        token,
-                        params={"start_pos": int(row), "end_pos": int(books_count)}
-                    ).json()
-                    rows = parse_payload(json_kabis)
-                    rows_flat = flatten_copies(rows)
-                    save_kabis_rows(session, rows_flat)
-                    return json_kabis
-                else:
-                    return {"Count books": books_count}
-            else:
-                json_kabis = api_get(
-                    "/get_books_range",
-                    token,
-                    params={"start_pos": 1, "end_pos": 100}
-                ).json()
-                print(json_kabis)
-                rows = parse_payload(json_kabis)
-                rows_flat = flatten_copies(rows)
-                save_kabis_rows(session, rows_flat)
-                return rows_flat
-            print("Row with max year:", row if row else None)
-
-        return {"Count books": books_count}
+        result = sync_kabis_upload()
+        return JSONResponse(content=result)
     except Exception as e:
         return JSONResponse({"error": f"Internal error: {e}"}, status_code=500)
 
