@@ -69,7 +69,6 @@ def book_search(query: str, k: int = 50, retriever=None) -> str:
     return _format_books(docs, max_items=k)
 
 
-
 @router.post("/chat", summary="Чат с ИИ")
 async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),          # фрагменты (контекст)

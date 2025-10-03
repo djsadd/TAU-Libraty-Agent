@@ -1,22 +1,18 @@
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from kabisapi.main import get_token, api_get
-from app.core.db import SessionLocal
 from sqlalchemy import select, func
 from app.models.kabis import Kabis
 from kabisapi.read_kabis import parse_payload, flatten_copies
 from app.core.config import settings
-from io import BytesIO
 
 from sqlalchemy.orm import Session
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from typing import List, Dict
+
 from app.core.book_quality_check import check_file
 from app.core.db import SessionLocal
 from app.models.job import Job, JobStatus
 from app.models.books import Document
-from ...worker import ingest_job, ingest_job_book  # импорт актёра
+from ...worker import ingest_job
 import uuid
 import os
 import requests
@@ -75,7 +71,6 @@ async def kabis_upload():
             row = count
             if row:
                 if row < books_count:
-                    print(row, books_count)
                     json_kabis = api_get(
                         "/get_books_range",
                         token,
@@ -96,7 +91,6 @@ async def kabis_upload():
                 print(json_kabis)
                 rows = parse_payload(json_kabis)
                 rows_flat = flatten_copies(rows)
-                # save_kabis_rows(session, list(unique_rows.values()))
                 save_kabis_rows(session, rows_flat)
                 return rows_flat
             print("Row with max year:", row if row else None)
