@@ -36,6 +36,7 @@ app.include_router(kabis_router)
 # APScheduler
 scheduler = AsyncIOScheduler()
 
+
 @app.on_event("startup")
 async def startup_event():
     # Планируем задачу: запуск каждый день в 02:00

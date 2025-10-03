@@ -1,7 +1,14 @@
 #
 # Start docker, redis, qdrant
+
+# docker run -d --name redis-container -p 6379:6379 redis:latest
+#
+#
+
+
 # uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # dramatiq app.worker:broker -p 2 -t 1
 # python run_dashboard.py # http://127.0.0.1:9199/
 # npm run preview
 #
+

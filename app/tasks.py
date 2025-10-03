@@ -2,11 +2,12 @@ import dramatiq
 import logging
 import asyncio
 import json
-from app.api.routes.kabis_integrate import kabis_upload
+from app.api.routes.kabis_upload import kabis_upload
 
 logger = logging.getLogger(__name__)
 
-@dramatiq.actor
+
+@dramatiq.actor(queue_name="index")
 def run_kabis_upload_task():
     logger.info("🚀 Старт задачи run_kabis_upload_task")
     try:

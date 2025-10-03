@@ -39,6 +39,26 @@ def index_documents(docs):
     )
 
 
+def index_title(docs):
+    splits = splitter.split_documents(docs)
+    Qdrant.from_documents(
+        documents=splits,
+        embedding=embeddings,
+        url=settings.QDRANT_URL,
+        prefer_grpc=False,
+        collection_name=settings.QDRANT_TITLE_COLLECTION,  # 👈 другая коллекция
+    )
+
+
+def get_title_retriever(k: int | None = None):
+    title_vectorstore = Qdrant(
+        client=client,
+        collection_name=settings.QDRANT_TITLE_COLLECTION,
+        embeddings=embeddings,
+    )
+    return title_vectorstore.as_retriever(search_kwargs={"k": k or settings.TOP_K})
+
+
 def get_retriever(k: int | None = None):
     return vectorstore.as_retriever(search_kwargs={"k": k or settings.TOP_K})
 
