@@ -17,7 +17,9 @@ from PIL import Image
 # Опционально для DOCX/EPUB
 from docx import Document as DocxDocument
 from ebooklib import epub
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+from app.core.config import settings
+
+pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
 
 # ---------- Метрики текста ----------
 def basic_text_metrics(text: str) -> dict:

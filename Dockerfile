@@ -1,23 +1,42 @@
 # Базовый образ
 FROM python:3.12.2-slim
 
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    libtesseract-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Переменные окружения
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+# Установим системные зависимости
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    curl \
+    git \
+    libffi-dev \
+    libssl-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Рабочая директория
 WORKDIR /app
 
-# Установим зависимости
+# Установим Python-зависимости проекта
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install torch --index-url https://download.pytorch.org/whl/cpu
 
 # Скопируем код проекта
 COPY . .
 
-# Открываем порт для FastAPI
+# Откроем порт
 EXPOSE 8000
 
-# По умолчанию запускаем uvicorn
-# (в docker-compose для Dramatiq мы переопределим команду)
+# Команда по умолчанию
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

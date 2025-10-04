@@ -8,9 +8,11 @@ class Settings(BaseSettings):
 
     GROQ_API_KEY: str
     OPENAI_SECRET_KEY: str
-    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_URL: str = "http://qdrant:6333"
     QDRANT_COLLECTION: str = "book_tau_e5"
     QDRANT_TITLE_COLLECTION: str = "titles"
+
+    TESSERACT_CMD: str
 
     DB_NAME: str
     DB_USERNAME: str

@@ -47,7 +47,7 @@ async def startup_event():
     scheduler.add_job(
         enqueue_task,
         trigger="interval",
-        seconds=60,  # раз в 30 секунд
+        seconds=120,  # раз в 30 секунд
         id="kabis_test_upload",
         replace_existing=True,
     )

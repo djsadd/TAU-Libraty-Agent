@@ -11,7 +11,7 @@ from app.models.books import Document
 from app.core.config import settings
 from app.models.kabis import Kabis
 # 1) подключаем Redis
-broker = RedisBroker(host="localhost", port=6379, db=0)
+broker = RedisBroker(host="redis", port=6379, db=0)
 dramatiq.set_broker(broker)
 
 
