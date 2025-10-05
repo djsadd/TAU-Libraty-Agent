@@ -28,12 +28,14 @@ WORKDIR /app
 
 # Установим Python-зависимости проекта
 COPY requirements.txt .
+
 RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip install torch --index-url https://download.pytorch.org/whl/cpu
+    && pip install --no-cache-dir -r requirements.txt
+    # && pip install torch --index-url https://download.pytorch.org/whl/cpu
 
 # Скопируем код проекта
 COPY . .
+
 
 # Откроем порт
 EXPOSE 8000
