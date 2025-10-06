@@ -36,7 +36,6 @@ RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
     # && pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-RUN pip install unstructured_inference
 # Скопируем код проекта
 COPY . .
 

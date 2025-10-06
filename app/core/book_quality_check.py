@@ -101,13 +101,11 @@ class PDFTextStats:
     sample_ocr_bad_frac: Optional[float]
     verdict: str
 
-
-def pdf_extract_text_stats(path: str, sample_pages_for_ocr: int = 6) -> PDFTextStats:
+def pdf_extract_text_stats(path: str) -> PDFTextStats:
     doc = fitz.open(path)
     n = doc.page_count
     pages_with_text = 0
     total_chars = 0
-    pages_no_text = []
 
     for i in range(n):
         page = doc.load_page(i)
@@ -115,71 +113,22 @@ def pdf_extract_text_stats(path: str, sample_pages_for_ocr: int = 6) -> PDFTextS
         total_chars += len(txt)
         if len(txt.strip()) >= 50:
             pages_with_text += 1
-        else:
-            pages_no_text.append(i)
 
-    # Евристика: если ≥70% страниц без текста — это «скан»
-    scanned_likely = (n > 0 and len(pages_no_text) / n >= 0.7)
-
-    ocr_avg_conf = None
-    ocr_bad_frac = None
-
-    if scanned_likely and n > 0:
-        # Возьмём равномерную выборку страниц для OCR
-        k = min(sample_pages_for_ocr, len(pages_no_text))
-        sample_idxs = (
-            random.sample(pages_no_text, k)
-            if len(pages_no_text) >= k else pages_no_text
-        )
-        confs = []
-        bad = 0
-        for idx in sample_idxs:
-            page = doc.load_page(idx)
-            # render (dpi 200–300)
-            pix = page.get_pixmap(dpi=250)
-            img = Image.open(io.BytesIO(pix.tobytes("png")))
-            # язык под себя: rus+kaz+eng при необходимости
-            data = pytesseract.image_to_data(img, lang="rus+kaz+eng", output_type=Output.DATAFRAME)
-            # фильтруем валидные элементы
-            vals = [c for c in data.get("conf", []) if isinstance(c, (int, float))]
-            if not vals:
-                bad += 1
-                continue
-            # Tesseract даёт -1 для «мусора»
-            page_confs = [v for v in vals if v >= 0]
-            if not page_confs:
-                bad += 1
-                continue
-            confs.append(sum(page_confs) / len(page_confs))
-        if confs:
-            ocr_avg_conf = sum(confs) / len(confs)
-        if sample_idxs:
-            ocr_bad_frac = bad / len(sample_idxs)
-
-    # Вердикт
+    # Вердикт без OCR
     if pages_with_text / max(1, n) >= 0.7 and total_chars >= 2000:
         verdict = "OK_TEXT_PDF"
-    elif scanned_likely and ocr_avg_conf is not None:
-        if ocr_avg_conf >= 70 and (ocr_bad_frac or 0) <= 0.3:
-            verdict = "OK_OCR"
-        elif ocr_avg_conf >= 50:
-            verdict = "LOW_OCR"
-        else:
-            verdict = "BAD_OCR"
-    elif scanned_likely:
-        verdict = "SCANNED_NEEDS_OCR"
     else:
-        # смешанный случай/тонкий PDF
-        verdict = "UNCLEAR_TRY_OCR_OR_RETRY_EXTRACT"
+        verdict = "SCANNED_OR_LOW_TEXT"
 
     return PDFTextStats(
         n_pages=n,
         pages_with_text=pages_with_text,
         total_chars=total_chars,
-        sample_ocr_avg_conf=ocr_avg_conf,
-        sample_ocr_bad_frac=ocr_bad_frac,
-        verdict=verdict,
+        sample_ocr_avg_conf=None,
+        sample_ocr_bad_frac=None,
+        verdict=verdict
     )
+
 
 
 def check_file(path: str) -> dict:

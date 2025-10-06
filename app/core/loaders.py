@@ -40,8 +40,9 @@ def load_docs(path: str, meta: Optional[dict] = None):
         if is_text_based_pdf(str(p)):
             docs = PyPDFLoader(str(p)).load()
         else:
-            # OCR-стратегия для сканов с указанием poppler_path
-            docs = UnstructuredPDFLoader(str(p), strategy="ocr").load()
+            # вместо OCR можно просто пропустить или пометить как скан
+            docs = []
+            print(f"Сканированный PDF пропущен: {p}")
 
     elif suffix in {".txt", ".md"}:
         docs = TextLoader(str(p), encoding="utf-8").load()
