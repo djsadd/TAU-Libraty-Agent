@@ -13,10 +13,6 @@ services:
       - qdrant
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgresql+psycopg2://${DB_USERNAME}:${DB_PASSWORD}@db:${DB_PORT}/${DB_NAME}
-      REDIS_URL: redis://redis:6379/0
-      QDRANT_URL: http://qdrant:6333
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
@@ -43,6 +39,15 @@ services:
       - redis
       - db
 
+  frontend:
+    build:
+      context: ./chat-fastapi-client  # путь к папке с React проектом
+      dockerfile: Dockerfile.frontend
+    environment:
+      - REACT_APP_API_URL=http://backend:8000/api/chat
+    container_name: tau-frontend
+    ports:
+      - "80:80"
 
   # ---------- PostgreSQL ----------
   db:

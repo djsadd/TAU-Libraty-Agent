@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "book_tau_e5"
     QDRANT_TITLE_COLLECTION: str = "titles"
 
+    REDIS_URL: str
+    REDIS_PORT: str
+
     TESSERACT_CMD: str
 
     DB_NAME: str

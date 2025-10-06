@@ -39,7 +39,7 @@ function Html({ html }: { html: string }) {
 }
 
 export default function App(): JSX.Element {
-  const [apiUrl, setApiUrl] = useState<string>(() => localStorage.getItem('apiUrl') || DEFAULT_API);
+  const [apiUrl, setApiUrl] = useState<string>('http://web');
   const [k, setK] = useState<number>(() => Number(localStorage.getItem('k')) || 4);
   const [question, setQuestion] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);

@@ -1,13 +1,10 @@
 from fastapi import APIRouter, UploadFile
-from pathlib import Path
 import uuid
 from ...core.config import settings
-from ...core.loaders import load_docs
-from ...core.vectorstore import index_documents
 from app.core.db import SessionLocal
 from app.models.job import Job, JobStatus
 from app.models.books import Document
-from ...worker import ingest_job  # импорт актёра
+from app.worker import ingest_job  # импорт актёра
 from app.core.book_quality_check import check_file
 
 

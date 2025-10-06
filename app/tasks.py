@@ -3,8 +3,14 @@ import logging
 import asyncio
 import json
 from app.api.routes.kabis_upload import kabis_upload
-
+import os
+import dramatiq
+from dramatiq.brokers.redis import RedisBroker
+from app.core.config import settings
 logger = logging.getLogger(__name__)
+
+broker = RedisBroker(host=settings.REDIS_URL, port=settings.REDIS_PORT, db=0)
+dramatiq.set_broker(broker)
 
 
 @dramatiq.actor(queue_name="index")

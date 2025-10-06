@@ -64,10 +64,11 @@ def load_docs(path: str, meta: Optional[dict] = None):
     # общие метаданные
     for d in docs:
         d.metadata.setdefault("source", str(p))
-        if meta["title"]:
+        if meta and "title" in meta and meta["title"]:
             d.metadata.setdefault("title", meta["title"])
         else:
             d.metadata.setdefault("title", p.stem)
+
     return docs
 
 
