@@ -181,4 +181,3 @@ def check_file(path: str) -> dict:
     })
     return report
 
-

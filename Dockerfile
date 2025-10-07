@@ -1,6 +1,10 @@
 # Базовый образ
 FROM python:3.12.2-slim
 
+RUN apt-get update && apt-get install -y libgl1 && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y poppler-utils &&
+
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-rus \
@@ -36,6 +40,8 @@ RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
     # && pip install torch --index-url https://download.pytorch.org/whl/cpu
 
+RUN pip install unstructured_inference
+RUN pip install pdf2image
 # Скопируем код проекта
 COPY . .
 

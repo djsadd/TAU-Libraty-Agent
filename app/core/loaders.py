@@ -1,6 +1,7 @@
 from pathlib import Path
 from langchain.schema import Document
-
+import platform
+import shutil
 from PyPDF2 import PdfReader
 from langchain_community.document_loaders import (
     PyPDFLoader,
@@ -12,7 +13,11 @@ from langchain_community.document_loaders import (
 from typing import Optional
 
 
-POPLER_PATH = r"C:\poppler-25.07.0\Library\bin"
+if platform.system() == "Windows":
+    POPPLER_PATH = r"C:\poppler-25.07.0\Library\bin"
+else:
+    # В Linux poppler ставится как система, путь не нужен
+    POPPLER_PATH = shutil.which("pdftoppm") or "/usr/bin/pdftoppm"
 
 
 def is_text_based_pdf(path: str) -> bool:
@@ -40,9 +45,7 @@ def load_docs(path: str, meta: Optional[dict] = None):
         if is_text_based_pdf(str(p)):
             docs = PyPDFLoader(str(p)).load()
         else:
-            # вместо OCR можно просто пропустить или пометить как скан
-            docs = []
-            print(f"Сканированный PDF пропущен: {p}")
+            docs = UnstructuredPDFLoader(str(p), strategy="hi_res").load()
 
     elif suffix in {".txt", ".md"}:
         docs = TextLoader(str(p), encoding="utf-8").load()

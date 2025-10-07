@@ -18,6 +18,8 @@ services:
       --host 0.0.0.0
       --port 8000
       --reload
+    volumes:
+      - ./uploads:/app/uploads   # <-- общий том с локальной папкой uploads
 
   dramatiq_scheduler:
     build: .
@@ -28,6 +30,8 @@ services:
     depends_on:
       - redis
       - db
+    volumes:
+      - ./uploads:/app/uploads   # <-- добавлено, чтобы тоже видел файлы
 
   dramatiq_worker:
     build: .
@@ -38,10 +42,12 @@ services:
     depends_on:
       - redis
       - db
+    volumes:
+      - ./uploads:/app/uploads   # <-- общий volume для worker
 
   frontend:
     build:
-      context: ./chat-fastapi-client  # путь к папке с React проектом
+      context: ./chat-fastapi-client
       dockerfile: Dockerfile.frontend
     environment:
       - REACT_APP_API_URL=http://backend:8000/api/chat
