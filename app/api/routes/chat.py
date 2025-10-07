@@ -5,14 +5,52 @@ from fastapi.responses import JSONResponse
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_core.tools import tool
+from sqlalchemy.orm import Session
 
+import time
+from fastapi import HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
 from ...deps import get_retriever_dep, get_llm, get_book_retriever_dep
+from app.models.chat import ChatHistory
 router = APIRouter(prefix="/api", tags=["chat"])
+from app.core.db import SessionLocal
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+class ChatHistoryItem(BaseModel):
+    sessionId: str
+    question: str
+    answer: str
+    tools_used: Optional[List[str]] = []
+    timestamp: Optional[float] = None  # UNIX timestamp
+
+
+def save_chat_history(db: Session, session_id: str, question: str, answer: str, tools_used: list[str]):
+    item = ChatHistory(
+        session_id=session_id,
+        question=question,
+        answer=answer,
+        tools_used=tools_used,
+        timestamp=time.time()
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
 
 
 class ChatRequest(BaseModel):
     query: str
     k: int | None = None
+    sessionId: Optional[str] = None  # новое поле
 
 
 def _format_docs(docs, per_chunk_chars=800, max_chunks=5):
@@ -69,38 +107,70 @@ def book_search(query: str, k: int = 50, retriever=None) -> str:
     return _format_books(docs, max_items=k)
 
 
+# глобальный словарь для хранения времени последнего запроса
+# ключ: sessionId, значение: timestamp последнего запроса
+_last_request_time: dict[str, float] = {}
+
+RATE_LIMIT_SECONDS = 30  # интервал между запросами
+
+
 @router.post("/chat", summary="Чат с ИИ")
 async def chat(req: ChatRequest,
-               retriever=Depends(get_retriever_dep),          # фрагменты (контекст)
-               book_retriever=Depends(get_book_retriever_dep),# книги (обзор)
-               llm=Depends(get_llm)):
+               retriever=Depends(get_retriever_dep),
+               book_retriever=Depends(get_book_retriever_dep),
+               llm=Depends(get_llm),
+               db: Session = Depends(get_db)):
 
-    try:
-        # инструменты
-        vs_tool = lambda q, k=5: vector_search.func(q, k, retriever=retriever)
-        bs_tool = lambda q, k=30: book_search.func(q, k, retriever=book_retriever)
+    session_id = req.sessionId or "anonymous"
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system",
-             "Ты помощник по поиску литературы в университете Туран-Астана. "
-             "Используй предоставленный контекст и список книг для ответа на вопросы студентов. "
-             "Если ответа нет — скажи об этом. Ответы возвращай в html формате"
-             "Книги доступны только во внутренней библиотеке университета."),
-            ("human", "Вопрос: {question}\n\nКонтекст:\n{context}\n\nКниги:\n{books}")
-        ])
+    # Выполняем LLM
+    vs_tool_used = []
+    bs_tool_used = []
 
-        chain = (
-                RunnableParallel(
-                    question=RunnablePassthrough(),
-                    context=lambda x: vs_tool(x, req.k or 5),  # поиск фрагментов
-                    books=lambda x: bs_tool(x, 30),  # поиск книг
-                )
-                | prompt
-                | llm
+    # Проверка лимита
+    now = time.time()
+    last_time = _last_request_time.get(session_id, 0)
+
+    if now - last_time < RATE_LIMIT_SECONDS:
+        return JSONResponse(
+            {"error": f"Слишком частые запросы. Попробуйте через {int(RATE_LIMIT_SECONDS - (now - last_time))} сек."},
+            status_code=429
         )
 
-        answer = chain.invoke(req.query)
-        return {"reply": answer.content}
+    # Обновляем время последнего запроса
+    _last_request_time[session_id] = now
 
-    except Exception as e:
-        return JSONResponse({"error": f"Internal error: {e}"}, status_code=500)
+    vs_tool = lambda q, k=5: (vs_tool_used.append("vector_search") or vector_search.func(q, k, retriever=retriever))
+    bs_tool = lambda q, k=30: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system",
+         "Ты помощник по поиску литературы в университете Туран-Астана. "
+         "Используй предоставленный контекст и список книг для ответа на вопросы студентов. "
+         "Если ответа нет — скажи об этом. Ответы возвращай в html формате. "
+         "Книги доступны только во внутренней библиотеке университета."),
+        ("human", "Вопрос: {question}\n\nКонтекст:\n{context}\n\nКниги:\n{books}")
+    ])
+
+    chain = (
+        RunnableParallel(
+            question=RunnablePassthrough(),
+            context=lambda x: vs_tool(x, req.k or 5),
+            books=lambda x: bs_tool(x, 30),
+        )
+        | prompt
+        | llm
+    )
+
+    answer = chain.invoke(req.query)
+
+    # Сохраняем в БД
+    save_chat_history(
+        db=db,
+        session_id=session_id,
+        question=req.query,
+        answer=answer.content,
+        tools_used=list(set(vs_tool_used + bs_tool_used))
+    )
+
+    return {"reply": answer.content}

@@ -1,16 +1,16 @@
 // src/App.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
+import { v4 as uuidv4 } from 'uuid';
 
 const DEFAULT_API = '/api/chat';
 
 type Role = 'user' | 'assistant';
 interface Msg { role: Role; content: string; t: number; error?: boolean }
 
-// Small helper to safely render HTML coming from LLM
+// Компонент для безопасного рендеринга HTML от LLM
 function Html({ html }: { html: string }) {
   const clean = useMemo(() => {
-    // Keep it conservative: allow basic formatting & links only
     const purified = DOMPurify.sanitize(html, {
       ALLOWED_TAGS: [
         'b', 'strong', 'i', 'em', 'u', 's', 'sup', 'sub',
@@ -22,15 +22,13 @@ function Html({ html }: { html: string }) {
       RETURN_TRUSTED_TYPE: false,
     });
 
-    // Ensure external links are safe
+    // Безопасные внешние ссылки
     const tmp = document.createElement('div');
     tmp.innerHTML = purified;
     tmp.querySelectorAll('a').forEach(a => {
       a.setAttribute('target', '_blank');
       a.setAttribute('rel', 'noopener noreferrer');
     });
-    // Optional: prevent remote images if you wish
-    // tmp.querySelectorAll('img').forEach(img => img.remove());
 
     return tmp.innerHTML;
   }, [html]);
@@ -39,7 +37,8 @@ function Html({ html }: { html: string }) {
 }
 
 export default function App(): JSX.Element {
-  const [apiUrl, setApiUrl] = useState<string>('http://web');
+  const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API);
+  const [sessionId, setSessionId] = useState<string>('');
   const [k, setK] = useState<number>(() => Number(localStorage.getItem('k')) || 4);
   const [question, setQuestion] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -50,13 +49,23 @@ export default function App(): JSX.Element {
   });
   const chatRef = useRef<HTMLDivElement | null>(null);
 
+  // Генерация уникального sessionId для пользователя
   useEffect(() => {
-    if (apiUrl.startsWith('http')) { // миграция со старых абсолютных значений
-      const next = '/api/chat';
+    let id = sessionStorage.getItem('sessionId');
+    if (!id) {
+      id = uuidv4();
+      sessionStorage.setItem('sessionId', id);
+    }
+    setSessionId(id);
+  }, []);
+
+  // Миграция старых абсолютных значений apiUrl
+  useEffect(() => {
+    if (apiUrl.startsWith('http')) {
+      const next = DEFAULT_API;
       setApiUrl(next);
       localStorage.setItem('apiUrl', next);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { localStorage.setItem('k', String(k)); }, [k]);
@@ -68,27 +77,33 @@ export default function App(): JSX.Element {
   async function send(): Promise<void> {
     const q = question.trim();
     if (!q) return;
+
     setError('');
     setLoading(true);
     setMessages(prev => [...prev, { role: 'user', content: q, t: Date.now() }]);
     setQuestion('');
 
     try {
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, k: Number(k) || 0 })
-      });
+        const payload = {
+          query: q,
+          k: Number(k) || 0,
+          sessionId // вот он UUID
+        };
+
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
       const data: any = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-      // The backend may now return rich HTML in `reply`. We render it safely.
       const reply = (data?.reply ?? '') as string;
       setMessages(prev => [...prev, { role: 'assistant', content: String(reply), t: Date.now() }]);
     } catch (e: unknown) {
       const m = e instanceof Error ? e.message : 'Ошибка запроса';
       setError(m);
-      setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${m}`,
-        t: Date.now(), error: true }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${m}`, t: Date.now(), error: true }]);
     } finally { setLoading(false); }
   }
 
@@ -118,7 +133,6 @@ export default function App(): JSX.Element {
             <span className="chip">K документов</span>
             <input className="number" type="number" min={0} max={50} value={k}
                    onChange={e => setK(Number(e.currentTarget.value))} />
-
             <button className="btn" onClick={clearChat} title="Очистить">Очистить</button>
           </div>
         </div>
