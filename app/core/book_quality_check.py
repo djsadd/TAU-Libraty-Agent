@@ -130,12 +130,35 @@ def pdf_extract_text_stats(path: str) -> PDFTextStats:
     )
 
 
-
 def check_file(path: str) -> dict:
     ext = os.path.splitext(path)[1].lower()
     report = {"path": path, "ext": ext}
 
+    # 1️⃣ Проверка, что файл существует и не пустой
+    if not os.path.exists(path):
+        report.update({"verdict": "MISSING_FILE"})
+        return report
+
+    if os.path.getsize(path) == 0:
+        report.update({"verdict": "EMPTY_FILE"})
+        return report
+
+    # 2️⃣ Обработка PDF
     if ext == ".pdf":
+        try:
+            with fitz.open(path) as doc:
+                if doc.page_count == 0:
+                    report.update({"verdict": "EMPTY_PDF", "type": "pdf"})
+                    return report
+        except Exception as e:
+            report.update({
+                "type": "pdf",
+                "verdict": "CORRUPTED_PDF",
+                "error": str(e)
+            })
+            return report
+
+        # Если успешно открылся → вызвать основную проверку
         pdf = pdf_extract_text_stats(path)
         report.update({
             "type": "pdf",
@@ -148,25 +171,30 @@ def check_file(path: str) -> dict:
         })
         return report
 
-    # Текстовые форматы
+    # 3️⃣ Текстовые форматы
     text = ""
-    if ext in (".txt",):
-        text = read_txt(path)
-    elif ext in (".docx",):
-        text = read_docx(path)
-    elif ext in (".epub",):
-        text = read_epub(path)
-    else:
-        report.update({"type": "unknown", "verdict": "UNSUPPORTED"})
+    try:
+        if ext == ".txt":
+            text = read_txt(path)
+        elif ext == ".docx":
+            text = read_docx(path)
+        elif ext == ".epub":
+            text = read_epub(path)
+        else:
+            report.update({"type": "unknown", "verdict": "UNSUPPORTED"})
+            return report
+    except Exception as e:
+        report.update({
+            "type": "textlike",
+            "verdict": "CORRUPTED_FILE",
+            "error": str(e)
+        })
         return report
 
+    # 4️⃣ Проверка читаемости текста
     text = fix_text(text)
     metrics = basic_text_metrics(text)
-
-    if text_is_readable(metrics):
-        verdict = "OK_TEXT"
-    else:
-        verdict = "BAD_TEXT"
+    verdict = "OK_TEXT" if text_is_readable(metrics) else "BAD_TEXT"
 
     report.update({
         "type": "textlike",
@@ -180,4 +208,5 @@ def check_file(path: str) -> dict:
         "verdict": verdict
     })
     return report
+
 
