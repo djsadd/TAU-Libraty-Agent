@@ -9,7 +9,7 @@ from .api.routes.upload import router as upload_router
 from .api.routes.chat import router as chat_router
 from .api.routes.jobs import router as jobs_router
 from .api.routes.kabis_integrate import router as kabis_router
-
+from app.api.routes.libtau_integrate import router as lib_router
 from app.tasks import run_kabis_upload_task  # наш актор
 
 # Логгер
@@ -32,6 +32,7 @@ app.include_router(upload_router)
 app.include_router(chat_router)
 app.include_router(jobs_router)
 app.include_router(kabis_router)
+app.include_router(lib_router)
 
 # APScheduler
 scheduler = AsyncIOScheduler()

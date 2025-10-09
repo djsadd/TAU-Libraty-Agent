@@ -10,6 +10,7 @@ from pathlib import Path
 from app.models.books import Document
 from app.core.config import settings
 from app.models.kabis import Kabis
+from app.models.libtau import Library
 # 1) подключаем Redis
 broker = RedisBroker(host=settings.REDIS_URL, port=settings.REDIS_PORT, db=0)
 dramatiq.set_broker(broker)
@@ -116,10 +117,60 @@ def process_file(job_id: str, filename: str, meta: dict | None = None):
         db.close()
 
 
+def process_file_library(job_id: str, filename: str, meta: dict | None = None):
+    save_path = Path(settings.UPLOAD_DIR) / filename
+    db = SessionLocal()
+    try:
+        update_job(db, job_id,
+                   status=JobStatus.processing,
+                   current_step="start",
+                   progress_pct=1,
+                   started_at=datetime.utcnow())
+
+        # === extract ===
+        update_job(db, job_id, current_step="extract", progress_pct=10)
+
+        docs = load_docs(save_path, meta) if meta else load_docs(save_path)
+
+        # === chunk ===
+        update_job(db, job_id, current_step="chunk", progress_pct=40)
+        index_documents(docs)
+
+        # === embed ===
+        update_job(db, job_id, current_step="embed", progress_pct=70)
+        # ... эмбеддинги ...
+
+        # === index ===
+        update_job(db, job_id, current_step="index", progress_pct=90)
+        if meta and meta.get("id"):
+            book = db.query(Library).filter(Library.id_book == str(meta["id"])).first()
+            if book:
+                book.file_is_indexed = True
+
+            db.commit()
+
+        update_job(db, job_id,
+                   status=JobStatus.succeeded,
+                   current_step="done",
+                   progress_pct=100,
+                   finished_at=datetime.utcnow())
+    except Exception as e:
+        update_job(db, job_id,
+                   status=JobStatus.failed,
+                   current_step="error",
+                   error_message=str(e),
+                   finished_at=datetime.utcnow())
+    finally:
+        db.close()
+
+
 @dramatiq.actor(max_retries=5, min_backoff=30000, queue_name="ingest")  # 30s, 2m, 10m...
 def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = None):
     if not filename:
         process_title_only(job_id, meta)
     else:
-        process_file(job_id, filename, meta)
+        if meta and meta.get("Library"):
+            process_file_library(job_id, filename, meta)
+        else:
+            process_file(job_id, filename, meta)
 

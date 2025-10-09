@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     KABIS_USERNAME: str
     KABIS_PASSWORD: str
 
+    LIB_TAU_USER: str
+    LIB_TAU_PASSWORD: str
+    LIB_TAU_HOST: str
+    LIB_TAU_PORT: str
+
     # Настройки для pydantic-settings v2
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -10,10 +10,11 @@ from sqlalchemy import create_engine
 
 from alembic import context
 from app.core.db import Base, DB_URL, engine
-import app.models.books  # <-- важно: импорт модуля, а не имя класса
-import app.models.job    # если у тебя есть Job в app/models/job.py
-import app.models.kabis    # если у тебя есть Job в app/models/job.py
-from app.models.chat import ChatHistory    # если у тебя есть Job в app/models/job.py
+import app.models.books
+import app.models.job
+import app.models.kabis
+from app.models.chat import ChatHistory
+from app.models.libtau import Library
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -48,7 +49,6 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    print("TABLES REGISTERED:", list(Base.metadata.tables.keys()))
     context.configure(
         url=DB_URL,
         target_metadata=target_metadata,
