@@ -143,7 +143,7 @@ def process_file_library(job_id: str, filename: str, meta: dict | None = None):
         # === index ===
         update_job(db, job_id, current_step="index", progress_pct=90)
         if meta and meta.get("id"):
-            book = db.query(Library).filter(Library.id_book == str(meta["id"])).first()
+            book = db.query(Library).filter(Library.id == str(meta["id"])).first()
             if book:
                 book.file_is_indexed = True
 
