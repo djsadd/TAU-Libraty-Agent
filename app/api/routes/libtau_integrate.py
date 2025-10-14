@@ -133,7 +133,6 @@ async def index_library_file_books():
             # вот здесь обновляем поле у row (Kabis)
             row.file_is_indexed = True
             session.commit()
-            break
 
     return {"Hello": "World"}
 
