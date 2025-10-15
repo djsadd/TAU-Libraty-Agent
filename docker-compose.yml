@@ -84,6 +84,7 @@ services:
   # ---------- Qdrant ----------
   qdrant:
     image: qdrant/qdrant:v1.11.0
+    mem_limit: 1.5g
     container_name: tau-qdrant
     restart: always
     ports:
