@@ -36,7 +36,7 @@ services:
   dramatiq_worker:
     build: .
     container_name: dramatiq_worker
-    command: dramatiq app.worker --processes 3 --threads 3
+    command: dramatiq app.worker --processes 2 --threads 2
     env_file:
       - .env
     depends_on:
@@ -84,7 +84,6 @@ services:
   # ---------- Qdrant ----------
   qdrant:
     image: qdrant/qdrant:v1.11.0
-    mem_limit: 1.5g
     container_name: tau-qdrant
     restart: always
     ports:
