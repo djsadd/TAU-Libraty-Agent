@@ -45,7 +45,7 @@ def load_docs(path: str, meta: Optional[dict] = None):
         if is_text_based_pdf(str(p)):
             docs = PyPDFLoader(str(p)).load()
         else:
-            docs = UnstructuredPDFLoader(str(p), strategy="hi_res").load()
+            docs = UnstructuredPDFLoader(str(p), strategy="hi_res", ocr_strategy="none").load()
 
     elif suffix in {".txt", ".md"}:
         docs = TextLoader(str(p), encoding="utf-8").load()

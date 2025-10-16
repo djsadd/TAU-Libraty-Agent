@@ -6,6 +6,7 @@ import charset_normalizer as chn
 from langdetect import detect, DetectorFactory
 DetectorFactory.seed = 0  # стабильность langdetect
 from ftfy import fix_text
+from collections import Counter
 
 # PDF
 import fitz  # PyMuPDF
@@ -20,6 +21,44 @@ from ebooklib import epub
 from app.core.config import settings
 
 pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+
+import math
+from collections import Counter
+
+
+def text_entropy(text: str) -> float:
+    text = text.lower()
+    freq = Counter(text)
+    total = len(text)
+    probs = [f/total for f in freq.values()]
+    return -sum(p * math.log2(p) for p in probs)
+
+
+def text_repetition_score(text: str) -> float:
+    """0 → нормальный текст, 1 → почти полностью повторяющийся"""
+    words = [w.lower() for w in text.split() if len(w) > 2]
+    if not words:
+        return 1.0
+    unique = len(set(words))
+    return 1 - (unique / len(words))
+
+
+def line_diversity_score(text: str) -> float:
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    if not lines:
+        return 1.0
+    unique = len(set(lines))
+    return unique / len(lines)
+
+
+def dominant_word_ratio(text: str) -> float:
+    words = [w.lower() for w in text.split() if w.isalpha()]
+    if not words:
+        return 1.0
+    common = Counter(words).most_common(5)
+    total = sum(freq for _, freq in common)
+    return total / len(words)
+
 
 # ---------- Метрики текста ----------
 def basic_text_metrics(text: str) -> dict:
@@ -50,15 +89,24 @@ def basic_text_metrics(text: str) -> dict:
         "lang": lang,
     }
 
-def text_is_readable(metrics: dict) -> bool:
+
+def text_is_readable(metrics: dict, text: str) -> bool:
+    rep_score = text_repetition_score(text)
+    line_div = line_diversity_score(text)
+    dom_ratio = dominant_word_ratio(text)
+
     return (
         metrics["len"] >= 1000 and
         metrics["printable_ratio"] >= 0.95 and
         metrics["alnum_ratio"] >= 0.60 and
         metrics["�_ratio"] < 0.005 and
         metrics["ctrl_ratio"] < 0.005 and
-        3 <= metrics["avg_token_len"] <= 20
+        3 <= metrics["avg_token_len"] <= 20 and
+        rep_score < 0.6 and
+        line_div > 0.3 and
+        dom_ratio < 0.4
     )
+
 
 # ---------- TXT/DOCX/EPUB ----------
 def read_txt(path: str) -> str:
@@ -66,6 +114,7 @@ def read_txt(path: str) -> str:
     best = chn.from_bytes(raw).best()
     text = str(best) if best else raw.decode("utf-8", errors="ignore")
     return fix_text(text)
+
 
 def read_docx(path: str) -> str:
     try:
@@ -91,6 +140,7 @@ def read_epub(path: str) -> str:
     text = re.sub(r"<[^>]+>", " ", " ".join(buf))
     return fix_text(text)
 
+
 # ---------- PDF ----------
 @dataclass
 class PDFTextStats:
@@ -100,6 +150,7 @@ class PDFTextStats:
     sample_ocr_avg_conf: Optional[float]
     sample_ocr_bad_frac: Optional[float]
     verdict: str
+
 
 def pdf_extract_text_stats(path: str) -> PDFTextStats:
     doc = fitz.open(path)
