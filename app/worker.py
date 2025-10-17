@@ -82,6 +82,8 @@ def process_file(job_id: str, filename: str, meta: dict | None = None):
 
         print(save_path)
         docs = load_docs(save_path, meta) if meta else load_docs(save_path)
+        if not docs:
+            raise Exception("Документы не были загружены")
 
         # === chunk ===
         update_job(db, job_id, current_step="chunk", progress_pct=40)
