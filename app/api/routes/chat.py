@@ -156,7 +156,7 @@ async def chat(req: ChatRequest,
         RunnableParallel(
             question=RunnablePassthrough(),
             context=lambda x: vs_tool(x, req.k or 5),
-            books=lambda x: bs_tool(x, 30),
+            books=lambda x: bs_tool(x, 10),
         )
         | prompt
         | llm
