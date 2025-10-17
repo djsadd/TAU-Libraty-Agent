@@ -141,7 +141,7 @@ async def chat(req: ChatRequest,
     _last_request_time[session_id] = now
 
     vs_tool = lambda q, k=5: (vs_tool_used.append("vector_search") or vector_search.func(q, k, retriever=retriever))
-    bs_tool = lambda q, k=30: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
+    # bs_tool = lambda q, k=30: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
 
     prompt = ChatPromptTemplate.from_messages([
         ("system",
