@@ -87,9 +87,9 @@ def _format_books(docs, max_items=None):
     for d in docs[:limit]:
         m = d.metadata or {}
         title = m.get("title", "Неизвестная книга")
-        subject = m.get("subject", "Дополнительная информация")
+        # subject = m.get("subject", "Дополнительная информация")
 
-        lines.append(f"📘 {title}\nДоп. инфо: {subject}")
+        lines.append(f"📘 {title}\n")
     return "\n\n".join(lines)
 
 
