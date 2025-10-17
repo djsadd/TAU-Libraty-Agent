@@ -117,7 +117,7 @@ RATE_LIMIT_SECONDS = 30  # интервал между запросами
 @router.post("/chat", summary="Чат с ИИ")
 async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
-               # book_retriever=Depends(get_book_retriever_dep),
+               book_retriever=Depends(get_book_retriever_dep),
                llm=Depends(get_llm),
                db: Session = Depends(get_db)):
 
@@ -141,7 +141,7 @@ async def chat(req: ChatRequest,
     _last_request_time[session_id] = now
 
     vs_tool = lambda q, k=5: (vs_tool_used.append("vector_search") or vector_search.func(q, k, retriever=retriever))
-    # bs_tool = lambda q, k=30: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
+    bs_tool = lambda q, k=30: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
 
     prompt = ChatPromptTemplate.from_messages([
         ("system",
@@ -156,7 +156,7 @@ async def chat(req: ChatRequest,
         RunnableParallel(
             question=RunnablePassthrough(),
             context=lambda x: vs_tool(x, req.k or 5),
-            # books=lambda x: bs_tool(x, 30),
+            books=lambda x: bs_tool(x, 30),
         )
         | prompt
         | llm
