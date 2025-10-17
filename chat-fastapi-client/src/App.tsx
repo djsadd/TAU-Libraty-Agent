@@ -11,30 +11,54 @@ interface Msg { role: Role; content: string; t: number; error?: boolean }
 // Компонент для безопасного рендеринга HTML от LLM
 function Html({ html }: { html: string }) {
   const clean = useMemo(() => {
-    const purified = DOMPurify.sanitize(html, {
+    let content = html.trim();
+
+    // Убираем обёртку ```html или ```plaintext
+    content = content
+      .replace(/^```(?:html|plaintext)?/i, '')
+      .replace(/```$/i, '')
+      .trim();
+
+    // Превращаем двойные переносы в <p>
+    content = content
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/\n/g, '<br/>');
+
+    // Санитизация
+    const purified = DOMPurify.sanitize(content, {
       ALLOWED_TAGS: [
         'b', 'strong', 'i', 'em', 'u', 's', 'sup', 'sub',
         'p', 'br', 'hr', 'blockquote', 'code', 'pre', 'span',
         'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
         'img', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
       ],
-      ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'src', 'alt'],
+      ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'src', 'alt', 'colspan', 'rowspan'],
       RETURN_TRUSTED_TYPE: false,
     });
 
-    // Безопасные внешние ссылки
     const tmp = document.createElement('div');
     tmp.innerHTML = purified;
+
+    // Ссылки безопасные
     tmp.querySelectorAll('a').forEach(a => {
       a.setAttribute('target', '_blank');
       a.setAttribute('rel', 'noopener noreferrer');
     });
 
+    // Таблицы — стилизуем
+    tmp.querySelectorAll('table').forEach(tbl => {
+      tbl.classList.add('ai-table');
+    });
+
+    // Убираем пустые <p> и <br> в конце
+    tmp.innerHTML = tmp.innerHTML.replace(/(<p>\s*<\/p>|<br\s*\/?>)+$/g, '');
+
     return tmp.innerHTML;
   }, [html]);
 
-  return <div dangerouslySetInnerHTML={{ __html: clean }} />;
+  return <div className="ai-html" dangerouslySetInnerHTML={{ __html: clean }} />;
 }
+
 
 export default function App(): JSX.Element {
   const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API);
@@ -75,37 +99,50 @@ export default function App(): JSX.Element {
   const canSend = useMemo(() => question.trim().length > 0 && !loading, [question, loading]);
 
   async function send(): Promise<void> {
-    const q = question.trim();
-    if (!q) return;
+  const q = question.trim();
+  if (!q) return;
 
-    setError('');
-    setLoading(true);
-    setMessages(prev => [...prev, { role: 'user', content: q, t: Date.now() }]);
-    setQuestion('');
+  setError('');
+  setLoading(true);
+  setMessages(prev => [...prev, { role: 'user', content: q, t: Date.now() }]);
+  setQuestion(''); // очищаем поле
 
-    try {
-        const payload = {
-          query: q,
-          k: Number(k) || 0,
-          sessionId // вот он UUID
-        };
+  try {
+    const payload = {
+      query: q,
+      k: Number(k) || 0,
+      sessionId,
+      context: messages.map(m => ({ role: m.role, content: m.content })).slice(-10) // немного истории
+    };
 
-        const res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-      const data: any = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-      const reply = (data?.reply ?? '') as string;
-      setMessages(prev => [...prev, { role: 'assistant', content: String(reply), t: Date.now() }]);
-    } catch (e: unknown) {
-      const m = e instanceof Error ? e.message : 'Ошибка запроса';
-      setError(m);
-      setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${m}`, t: Date.now(), error: true }]);
-    } finally { setLoading(false); }
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+
+    // Очистим ответ от шумов
+    let reply = String(data?.reply ?? '')
+      .replace(/^```(?:html|plaintext)?/i, '')
+      .replace(/```$/i, '')
+      .trim();
+
+    // Убираем лишние переводы
+    reply = reply.replace(/\n{3,}/g, '\n\n');
+
+    setMessages(prev => [...prev, { role: 'assistant', content: reply, t: Date.now() }]);
+  } catch (e: unknown) {
+    const m = e instanceof Error ? e.message : 'Ошибка запроса';
+    setError(m);
+    setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${m}`, t: Date.now(), error: true }]);
+  } finally {
+    setLoading(false);
   }
+}
+
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if ((e.key === 'Enter' || (e as any).keyCode === 13) && !e.shiftKey) {
