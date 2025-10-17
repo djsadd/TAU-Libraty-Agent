@@ -1,6 +1,7 @@
 import os, math, random, io
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
+import re
 
 import charset_normalizer as chn
 from langdetect import detect, DetectorFactory
@@ -24,6 +25,45 @@ pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
 
 import math
 from collections import Counter
+
+
+def is_scanned_pdf(path: str, min_text_per_page: int = 300, min_text_fraction: float = 0.3) -> bool:
+    """Определяет, что PDF — скан (а не текстовый), без OCR."""
+    try:
+        doc = fitz.open(path)
+    except Exception:
+        return True  # битый PDF считаем как скан/нечитабельный
+
+    n_pages = doc.page_count
+    if n_pages == 0:
+        return True
+
+    pages_with_text = 0
+    total_chars = 0
+    image_pages = 0
+
+    for i in range(min(n_pages, 10)):  # проверяем только первые 10 страниц для скорости
+        page = doc.load_page(i)
+        text = page.get_text("text")
+        total_chars += len(text)
+        if len(text.strip()) > min_text_per_page:
+            pages_with_text += 1
+        if len(page.get_images()) > 0:
+            image_pages += 1
+
+    avg_chars = total_chars / max(1, min(n_pages, 10))
+    text_fraction = pages_with_text / max(1, min(n_pages, 10))
+
+    # 🎯 Эвристика
+    # - почти нет текста
+    # - при этом есть изображения
+    if text_fraction < min_text_fraction and image_pages > pages_with_text:
+        return True
+
+    if avg_chars < 200 and text_fraction < 0.4:
+        return True
+
+    return False
 
 
 def text_entropy(text: str) -> float:
@@ -136,7 +176,6 @@ def read_epub(path: str) -> str:
             except Exception:
                 pass
     # очень грубо: убрать теги
-    import re
     text = re.sub(r"<[^>]+>", " ", " ".join(buf))
     return fix_text(text)
 
@@ -157,6 +196,7 @@ def pdf_extract_text_stats(path: str) -> PDFTextStats:
     n = doc.page_count
     pages_with_text = 0
     total_chars = 0
+    sample_text = []
 
     for i in range(n):
         page = doc.load_page(i)
@@ -164,12 +204,24 @@ def pdf_extract_text_stats(path: str) -> PDFTextStats:
         total_chars += len(txt)
         if len(txt.strip()) >= 50:
             pages_with_text += 1
+        # добавим текст для анализа только с первых 5 страниц
+        if i < 5:
+            sample_text.append(txt)
+
+    text_sample = " ".join(sample_text)
+    rep_score = text_repetition_score(text_sample)
+    entropy = text_entropy(text_sample)
+    line_div = line_diversity_score(text_sample)
 
     # Вердикт без OCR
     if pages_with_text / max(1, n) >= 0.7 and total_chars >= 2000:
         verdict = "OK_TEXT_PDF"
     else:
         verdict = "SCANNED_OR_LOW_TEXT"
+
+    # Проверка на мусор
+    if total_chars / max(1, n) > 100_000 or rep_score > 0.8 or entropy < 2.0 or line_div < 0.3:
+        verdict = "CORRUPTED_TEXT_LAYER"
 
     return PDFTextStats(
         n_pages=n,
@@ -183,42 +235,60 @@ def pdf_extract_text_stats(path: str) -> PDFTextStats:
 
 def check_file(path: str) -> dict:
     ext = os.path.splitext(path)[1].lower()
-    report = {"path": path, "ext": ext}
+    report = {"path": path, "ext": ext, "book_quality": "UNKNOWN"}
 
     # 1️⃣ Проверка, что файл существует и не пустой
     if not os.path.exists(path):
-        report.update({"verdict": "MISSING_FILE"})
+        report.update({"verdict": "MISSING_FILE", "book_quality": "REJECT"})
         return report
 
     if os.path.getsize(path) == 0:
-        report.update({"verdict": "EMPTY_FILE"})
+        report.update({"verdict": "EMPTY_FILE", "book_quality": "REJECT"})
         return report
 
-    # 2️⃣ Обработка PDF
     if ext == ".pdf":
         try:
-            with fitz.open(path) as doc:
-                if doc.page_count == 0:
-                    report.update({"verdict": "EMPTY_PDF", "type": "pdf"})
-                    return report
+            if is_scanned_pdf(path):
+                report.update({
+                    "type": "pdf",
+                    "verdict": "LIKELY_SCANNED",
+                    "book_quality": "SKIP_LOAD"
+                })
+                return report
         except Exception as e:
             report.update({
                 "type": "pdf",
-                "verdict": "CORRUPTED_PDF",
+                "verdict": "SCAN_DETECT_ERROR",
+                "book_quality": "REJECT",
                 "error": str(e)
             })
             return report
 
-        # Если успешно открылся → вызвать основную проверку
         pdf = pdf_extract_text_stats(path)
+        avg_chars = pdf.total_chars / max(1, pdf.n_pages)
+
+        # 💡 Фильтр качества PDF
+        if avg_chars > 100_000:
+            quality = "CORRUPTED_TEXT_LAYER"
+            verdict = "SKIP_LOAD"
+        elif pdf.pages_with_text == 0:
+            quality = "EMPTY_OR_SCANNED"
+            verdict = "SKIP_LOAD"
+        elif pdf.verdict == "SCANNED_OR_LOW_TEXT":
+            quality = "POOR"
+            verdict = "SKIP_LOAD"
+        else:
+            quality = "GOOD"
+            verdict = pdf.verdict
+
         report.update({
             "type": "pdf",
             "pages": pdf.n_pages,
             "pages_with_text": pdf.pages_with_text,
             "total_chars": pdf.total_chars,
-            "ocr_avg_conf": pdf.sample_ocr_avg_conf,
-            "ocr_bad_frac": pdf.sample_ocr_bad_frac,
-            "verdict": pdf.verdict
+            "avg_chars_per_page": round(avg_chars),
+            "verdict": verdict,
+            "book_quality": quality,
         })
         return report
 
@@ -232,20 +302,37 @@ def check_file(path: str) -> dict:
         elif ext == ".epub":
             text = read_epub(path)
         else:
-            report.update({"type": "unknown", "verdict": "UNSUPPORTED"})
+            report.update({
+                "type": "unknown",
+                "verdict": "UNSUPPORTED",
+                "book_quality": "REJECT"
+            })
             return report
     except Exception as e:
         report.update({
             "type": "textlike",
             "verdict": "CORRUPTED_FILE",
+            "book_quality": "REJECT",
             "error": str(e)
         })
         return report
 
-    # 4️⃣ Проверка читаемости текста
+    # 4️⃣ Проверка читаемости и качества текста
     text = fix_text(text)
     metrics = basic_text_metrics(text)
-    verdict = "OK_TEXT" if text_is_readable(metrics) else "BAD_TEXT"
+    entropy = text_entropy(text)
+    rep_score = text_repetition_score(text)
+    line_div = line_diversity_score(text)
+
+    if text_is_readable(metrics, text) and entropy > 3.0 and rep_score < 0.6 and line_div > 0.3:
+        verdict = "OK_TEXT"
+        quality = "GOOD"
+    elif entropy < 2.0 or rep_score > 0.8 or line_div < 0.2:
+        verdict = "REPEATED_OR_LOW_QUALITY_TEXT"
+        quality = "POOR"
+    else:
+        verdict = "BAD_TEXT"
+        quality = "POOR"
 
     report.update({
         "type": "textlike",
@@ -256,8 +343,13 @@ def check_file(path: str) -> dict:
         "ctrl_ratio": round(metrics["ctrl_ratio"], 6),
         "avg_token_len": round(metrics["avg_token_len"], 2),
         "lang": metrics["lang"],
-        "verdict": verdict
+        "entropy": round(entropy, 3),
+        "repetition_score": round(rep_score, 3),
+        "line_diversity": round(line_div, 3),
+        "verdict": verdict,
+        "book_quality": quality
     })
     return report
+
 
 
