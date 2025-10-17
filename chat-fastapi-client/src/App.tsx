@@ -51,7 +51,11 @@ function Html({ html }: { html: string }) {
     });
 
     // Убираем пустые <p> и <br> в конце
-    tmp.innerHTML = tmp.innerHTML.replace(/(<p>\s*<\/p>|<br\s*\/?>)+$/g, '');
+    // Убираем пустые узлы и <br> в начале и в конце
+    tmp.innerHTML = tmp.innerHTML
+      .replace(/^(\s|<br\s*\/?>|<p>\s*<\/p>|&nbsp;)+/gi, '')
+      .replace(/(\s|<br\s*\/?>|<p>\s*<\/p>|&nbsp;)+$/gi, '');
+
 
     return tmp.innerHTML;
   }, [html]);
@@ -125,10 +129,17 @@ export default function App(): JSX.Element {
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
 
     // Очистим ответ от шумов
+    // Очистим ответ от шумов
     let reply = String(data?.reply ?? '')
       .replace(/^```(?:html|plaintext)?/i, '')
       .replace(/```$/i, '')
+      .replace(/^\s+|\s+$/g, '') // 💡 убираем пробелы и переносы в начале и конце
+      .replace(/^\n+|\n+$/g, '') // 💡 дополнительно чистим лишние переводы
       .trim();
+
+    // Убираем лишние переводы внутри
+    reply = reply.replace(/\n{3,}/g, '\n\n');
+
 
     // Убираем лишние переводы
     reply = reply.replace(/\n{3,}/g, '\n\n');
