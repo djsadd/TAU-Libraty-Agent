@@ -117,7 +117,7 @@ RATE_LIMIT_SECONDS = 30  # интервал между запросами
 @router.post("/chat", summary="Чат с ИИ")
 async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
-               book_retriever=Depends(get_book_retriever_dep),
+               # book_retriever=Depends(get_book_retriever_dep),
                llm=Depends(get_llm),
                db: Session = Depends(get_db)):
 
