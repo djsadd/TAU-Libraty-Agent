@@ -63,7 +63,7 @@ def _format_docs(docs, per_chunk_chars=800, max_chunks=5):
         page = m.get("page", "?")
         text = (d.page_content or "")[:per_chunk_chars].strip()
         lines.append(f"[{title}, стр. {page}] {text}")
-        print(title, m.get("source"))
+        print(title, m.get("source"), text)
     return "\n\n".join(lines)
 
 
