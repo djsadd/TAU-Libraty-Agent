@@ -63,7 +63,6 @@ def _format_docs(docs, per_chunk_chars=800, max_chunks=5):
         page = m.get("page", "?")
         text = (d.page_content or "")[:per_chunk_chars].strip()
         lines.append(f"[{title}, стр. {page}] {text}")
-    print("\n\n".join(lines))
     return "\n\n".join(lines)
 
 
@@ -88,6 +87,7 @@ def _format_books(docs, max_items=None):
         m = d.metadata or {}
         title = m.get("title", "Неизвестная книга")
         # subject = m.get("subject", "Дополнительная информация")
+        print(title, m.get("title"), m.get("id_book"))
 
         lines.append(f"📘 {title}\n")
     return "\n\n".join(lines)
@@ -141,7 +141,7 @@ async def chat(req: ChatRequest,
     _last_request_time[session_id] = now
 
     vs_tool = lambda q, k=5: (vs_tool_used.append("vector_search") or vector_search.func(q, k, retriever=retriever))
-    bs_tool = lambda q, k=30: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
+    bs_tool = lambda q, k=10: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
 
     prompt = ChatPromptTemplate.from_messages([
         ("system",
