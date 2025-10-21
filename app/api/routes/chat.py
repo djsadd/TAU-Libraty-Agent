@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
-
+import re
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_core.tools import tool
@@ -15,6 +15,23 @@ from ...deps import get_retriever_dep, get_llm, get_book_retriever_dep
 from app.models.chat import ChatHistory
 router = APIRouter(prefix="/api", tags=["chat"])
 from app.core.db import SessionLocal
+
+
+import re
+
+def clean_context(text: str) -> str:
+    """
+    Удаляет из контекста разделы типа 'Список литературы', 'Литература', 'References'
+    чтобы LLM не выдавала упомянутые книги из текстов.
+    """
+    text = re.sub(
+        r"(Список литературы|Литература|References)[\s\S]*?$",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+    return text.strip()
+
 
 
 def get_db():
@@ -147,30 +164,31 @@ async def chat(req: ChatRequest,
     prompt = ChatPromptTemplate.from_messages([
         (
             "system",
-            "Ты — интеллектуальный помощник по поиску литературы для студентов университета «Туран-Астана»."
-            "Отвечай только на основании информации, представленной в разделе «Контекст» и «Книги»."
-            "Не используй внешние источники и не придумывай факты, если данных в контексте недостаточно."
-            "Если в предоставленных данных нет точного ответа — честно сообщи: "
-            "«В доступных источниках университета Туран-Астана информации нет.» "
-            "Отвечай кратко, по существу, в формате HTML, сохраняя структуру и читаемость (например, <p>, <ul>, <li>, <b>)."
-            "Не добавляй вступлений, выводов или информации, не основанной на контексте."
+            "Ты — интеллектуальный помощник по поиску литературы для студентов университета «Туран-Астана».\n"
+            "Используй только те книги, которые явно указаны в разделе «Книги» — это внутренний каталог библиотеки.\n"
+            "Если внутри книги встречаются списки литературы или упомянутые источники, **не предлагай их** — "
+            "они могут не быть доступны в библиотеке.\n"
+            "Отвечай строго на основании текста в разделе «Контекст» и названий книг из «Книги».\n"
+            "Если данных недостаточно — честно сообщи: "
+            "«В доступных источниках университета Туран-Астана информации нет.»\n"
+            "Отвечай кратко, по существу, в HTML-формате (<p>, <ul>, <li>, <b>)."
         ),
         (
             "human",
             "Вопрос студента: {question}\n\n"
             "Контекст:\n{context}\n\n"
-            "Список доступных книг:\n{books}"
+            "Список доступных книг (официальная библиотека):\n{books}"
         )
     ])
 
     chain = (
-        RunnableParallel(
-            question=RunnablePassthrough(),
-            context=lambda x: vs_tool(x, req.k or 5),
-            books=lambda x: bs_tool(x, 10),
-        )
-        | prompt
-        | llm
+            RunnableParallel(
+                question=RunnablePassthrough(),
+                context=lambda q: clean_context(vs_tool(q, req.k or 5)),  # применяем фильтр тут
+                books=lambda q: bs_tool(q, 10),
+            )
+            | prompt
+            | llm
     )
 
     answer = chain.invoke(req.query)
