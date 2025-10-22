@@ -131,7 +131,6 @@ _last_request_time: dict[str, float] = {}
 
 RATE_LIMIT_SECONDS = 5  # интервал между запросами
 
-
 @router.post("/chat", summary="Чат с ИИ")
 async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
@@ -158,9 +157,11 @@ async def chat(req: ChatRequest,
     # Обновляем время последнего запроса
     _last_request_time[session_id] = now
 
+    # Определяем инструменты
     vs_tool = lambda q, k=5: (vs_tool_used.append("vector_search") or vector_search.func(q, k, retriever=retriever))
     bs_tool = lambda q, k=10: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
 
+    # Промпт
     prompt = ChatPromptTemplate.from_messages([
         (
             "system",
@@ -180,16 +181,22 @@ async def chat(req: ChatRequest,
         )
     ])
 
+    # Теперь добавляем комбинированный контекст (vector_search + book_search)
+    def get_combined_context(q: str):
+        vs_context = clean_context(vs_tool(q, req.k or 5))
+        bs_context = clean_context(bs_tool(q, req.k or 10))
+        return f"{vs_context}\n\n{bs_context}"
+
     chain = (
-            RunnableParallel(
-                question=RunnablePassthrough(),
-                context=lambda q: clean_context(vs_tool(q, req.k or 5)),  # применяем фильтр тут
-                books=lambda q: "",  # отключаем book_search
-            )
-            | prompt
-            | llm
+        RunnableParallel(
+            question=RunnablePassthrough(),
+            context=lambda q: get_combined_context(q),
+        )
+        | prompt
+        | llm
     )
 
+    # Запуск LLM
     answer = chain.invoke(req.query)
 
     # Сохраняем в БД
@@ -202,3 +209,4 @@ async def chat(req: ChatRequest,
     )
 
     return {"reply": answer.content}
+
