@@ -18,31 +18,32 @@ html, body {
   padding: 1rem;
   text-align: center;
 }
+.ai-html img, .ai-html figure, .ai-html picture, .ai-html source {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+}
 
 /* === Контейнер приложения === */
 .container {
   display: flex;
   justify-content: center;
-}
-.book-list {
+}.book-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 3 карточки на строку */
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.8rem;
-  justify-items: stretch; /* карточки растянутся равномерно */
+  justify-items: stretch;
 }
 
-.book-card {
-  width: 100%;
-  height: 220px;
-  max-width: none;       /* убираем ограничение в px */
-  border-radius: 12px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.06);
-}
-
+.book-card { width: 100%; height: 220px; max-width: none; }
 .book-cover { height: 90px; object-fit: cover; }
-
 .book-title { font-size: .85rem; height: 2.2em; }
-.book-author, .book-year, .book-desc { font-size: .72rem; }
+.book-author,.book-year,.book-desc { font-size: .72rem; }
+
+@media (max-width: 700px)  { .book-list { grid-template-columns: repeat(2, 1fr);} }
+@media (max-width: 450px)  { .book-list { grid-template-columns: 1fr;} }
+
 
 /* адаптив */
 @media (max-width: 700px) {

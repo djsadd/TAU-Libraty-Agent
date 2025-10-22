@@ -46,13 +46,14 @@ function Html({ html }: { html: string }) {
         'a','h1','h2','h3','h4','h5','h6'
       ],
       ALLOWED_ATTR: ['href','title','target','rel','colspan','rowspan'],
-      FORBID_TAGS: ['img'],          // 👈 гарантированно вырежет картинки
+      FORBID_TAGS: ['img','figure','picture','source'],   // 👈 добавили
       RETURN_TRUSTED_TYPE: false,
     });
 
 
     const tmp = document.createElement('div');
     tmp.innerHTML = purified;
+    tmp.querySelectorAll('img, figure, picture, source').forEach(n => n.remove());
 
     // Ссылки безопасные
     tmp.querySelectorAll('a').forEach(a => {
