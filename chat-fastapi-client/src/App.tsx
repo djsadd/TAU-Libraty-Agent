@@ -81,7 +81,13 @@ function Html({ html }: { html: string }) {
 }
 function BookCard({ book, onOpen }: { book: Msg['books'][0]; onOpen: (b: Msg['books'][0]) => void }) {
   return (
-     <button type="button" className="book-card" onClick={() => onOpen(book)} title="Подробнее">
+    <button
+      type="button"
+      className="book-card"
+      title="Подробнее"
+      // ВАЖНО: открываем на mouseup и гасим всплытие
+      onMouseUp={(e) => { e.stopPropagation(); onOpen(book); }}
+    >
       <div className="book-info">
         <div className="book-title">{book.title}</div>
         {book.author && <div className="book-author">Автор: {book.author}</div>}
@@ -92,7 +98,6 @@ function BookCard({ book, onOpen }: { book: Msg['books'][0]; onOpen: (b: Msg['bo
   );
 }
 
-
 function Modal({
   open,
   onClose,
@@ -102,31 +107,24 @@ function Modal({
   onClose: () => void;
   book?: Msg['books'][0];
 }) {
-  // Создаём узел-держатель один раз
   const mountEl = useMemo(() => {
     const el = document.createElement('div');
     el.className = 'modal-portal';
     return el;
   }, []);
 
-  // Монтируем/размонтируем портал в body
   useEffect(() => {
     document.body.appendChild(mountEl);
-    return () => {
-      try { document.body.removeChild(mountEl); } catch {}
-    };
+    return () => { try { document.body.removeChild(mountEl); } catch {} };
   }, [mountEl]);
 
-  // Лочим прокрутку body, когда модалка открыта
   useEffect(() => {
-    if (open) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = prev; };
-    }
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
   }, [open]);
 
-  // Закрывать только при клике по «фону», а не по содержимому
   const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) onClose();
   };
@@ -140,18 +138,12 @@ function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={book.title}
-        onMouseDown={(e) => e.stopPropagation()} // блокируем всплытие
+        // Блокируем всплытие МЫШИ на диалоге — ключевой момент
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
           <h3 className="modal-title">{book.title}</h3>
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
         </div>
         <div className="modal-body">
           {book.author && <p><b>Автор:</b> {book.author}</p>}
@@ -166,6 +158,7 @@ function Modal({
     mountEl
   );
 }
+
 
 
 export default function App(): JSX.Element {
