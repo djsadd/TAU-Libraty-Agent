@@ -3,7 +3,7 @@ from .config import settings
 
 # создаётся один раз на импорт
 llm = ChatGroq(
-    model="llama-3.1-8b-instant",
+    model="openai/gpt-oss-120b",
     groq_api_key=settings.GROQ_API_KEY,
     temperature=0.0,
     max_tokens=2048,
