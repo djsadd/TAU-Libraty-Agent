@@ -91,6 +91,8 @@ function BookCard({ book, onOpen }: { book: Msg['books'][0]; onOpen: (b: Msg['bo
     </button>
   );
 }
+
+
 function Modal({
   open,
   onClose,
@@ -100,35 +102,56 @@ function Modal({
   onClose: () => void;
   book?: Msg['books'][0];
 }) {
-  const mountRef = useRef<HTMLDivElement | null>(null);
-  if (!mountRef.current) mountRef.current = document.createElement('div');
-
-  // монтируем контейнер в body
-  useEffect(() => {
-    const el = mountRef.current!;
-    document.body.appendChild(el);
-    return () => { document.body.removeChild(el); };
+  // Создаём узел-держатель один раз
+  const mountEl = useMemo(() => {
+    const el = document.createElement('div');
+    el.className = 'modal-portal';
+    return el;
   }, []);
 
-  // блокируем прокрутку подложки
+  // Монтируем/размонтируем портал в body
   useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    document.body.appendChild(mountEl);
+    return () => {
+      try { document.body.removeChild(mountEl); } catch {}
+    };
+  }, [mountEl]);
+
+  // Лочим прокрутку body, когда модалка открыта
+  useEffect(() => {
+    if (open) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
   }, [open]);
+
+  // Закрывать только при клике по «фону», а не по содержимому
+  const handleOverlayMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onClose();
+  };
 
   if (!open || !book) return null;
 
   return createPortal(
-    <div className="modal" onClick={onClose}>
+    <div className="modal" onMouseDown={handleOverlayMouseDown}>
       <div
         className="modal-dialog"
-        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-label={book.title}
+        onMouseDown={(e) => e.stopPropagation()} // блокируем всплытие
       >
         <div className="modal-header">
           <h3 className="modal-title">{book.title}</h3>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
         </div>
         <div className="modal-body">
           {book.author && <p><b>Автор:</b> {book.author}</p>}
@@ -140,9 +163,10 @@ function Modal({
         </div>
       </div>
     </div>,
-    mountRef.current
+    mountEl
   );
 }
+
 
 export default function App(): JSX.Element {
   const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API);
