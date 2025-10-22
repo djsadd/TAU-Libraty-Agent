@@ -129,7 +129,7 @@ def book_search(query: str, k: int = 50, retriever=None) -> str:
 # ключ: sessionId, значение: timestamp последнего запроса
 _last_request_time: dict[str, float] = {}
 
-RATE_LIMIT_SECONDS = 30  # интервал между запросами
+RATE_LIMIT_SECONDS = 5  # интервал между запросами
 
 
 @router.post("/chat", summary="Чат с ИИ")
