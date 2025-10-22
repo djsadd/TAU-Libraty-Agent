@@ -269,44 +269,92 @@ const [selected, setSelected] = useState<Msg['books'][0] | undefined>();
 
   function clearChat(): void { setMessages([]); setError(''); }
 
-  return (
-    <div className="container">
-      <div className="app">
-        {/* ... hdr ... */}
-
-        <div className="chat" ref={chatRef}>
-          {/* ... пустой старт ... */}
-
-          {messages.map((m, i) => (
-            <div className={`group ${m.role}`} key={m.t + ':' + i}>
-              <div className="meta">{m.role === 'user' ? 'Вы' : 'Бот'} • {new Date(m.t).toLocaleTimeString()}</div>
-              <div className={`bubble ${m.error ? 'err' : ''}`}>
-                {m.role === 'assistant' ? (
-                  <>
-                    {m.books && m.books.length > 0 && (
-                      <div className="book-list">
-                        {m.books.map((b, j) => (
-                          <BookCard key={j} book={b} onOpen={setSelected} />
-                        ))}
-                      </div>
-                    )}
-                    <Html html={m.content} />
-                  </>
-                ) : (
-                  <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{m.content}</pre>
-                )}
-              </div>
+ return (
+  <div className="container">
+    <div className="app">
+      {/* === HEADER === */}
+      <div className="hdr">
+        <div className="brand">
+          <div className="logo" />
+          <div>
+            <div className="title">AI Чат по книгам</div>
+            <div className="status">
+              ИИ модель: {error ? <span className="pill err">ошибка</span> : <span className="pill ok">готова</span>}
             </div>
-          ))}
-
-          {loading && <div className="skeleton" />}
+          </div>
         </div>
-
-        {/* ... input row & footer ... */}
+        <div className="toolbar">
+          <span className="chip">K документов</span>
+          <input
+            className="number"
+            type="number"
+            min={0}
+            max={50}
+            value={k}
+            onChange={e => setK(Number(e.currentTarget.value))}
+          />
+          <button className="btn" onClick={clearChat} title="Очистить">Очистить</button>
+        </div>
       </div>
 
-      {/* МОДАЛКА */}
-      <Modal open={!!selected} onClose={() => setSelected(undefined)} book={selected} />
+      {/* === CHAT === */}
+      <div className="chat" ref={chatRef}>
+        {messages.length === 0 && !loading && (
+          <div className="group assistant">
+            <div className="meta">Бот • {new Date().toLocaleTimeString()}</div>
+            <div className="bubble">
+              Задайте вопрос по содержимому загруженных книг. Например: «Где в книге по менеджменту есть про KPI?»
+            </div>
+          </div>
+        )}
+
+        {messages.map((m, i) => (
+          <div className={`group ${m.role}`} key={m.t + ':' + i}>
+            <div className="meta">{m.role === 'user' ? 'Вы' : 'Бот'} • {new Date(m.t).toLocaleTimeString()}</div>
+            <div className={`bubble ${m.error ? 'err' : ''}`}>
+              {m.role === 'assistant' ? (
+                <>
+                  {m.books && m.books.length > 0 && (
+                    <div className="book-list">
+                      {m.books.map((b, j) => (
+                        <BookCard key={j} book={b} onOpen={setSelected} />
+                      ))}
+                    </div>
+                  )}
+                  <Html html={m.content} />
+                </>
+              ) : (
+                <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{m.content}</pre>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {loading && <div className="skeleton" />}
+      </div>
+
+      {/* === INPUT ROW === */}
+      <div className="row">
+        <textarea
+          className="textarea"
+          rows={2}
+          placeholder="Сформулируйте вопрос… (Enter — отправить, Shift+Enter — перенос строки)"
+          value={question}
+          onChange={e => setQuestion(e.currentTarget.value)}
+          onKeyDown={onKeyDown}
+        />
+        <button className="btn" onClick={() => void send()} disabled={!canSend}>
+          {loading ? 'Отправка…' : 'Отправить'}
+        </button>
+      </div>
+
+      {/* === FOOTER === */}
+      <div className="footer">
+        <span className="chip">Департамент цифровой трансформации</span>
+      </div>
     </div>
-  );
-}
+
+    {/* === MODAL === */}
+    <Modal open={!!selected} onClose={() => setSelected(undefined)} book={selected} />
+  </div>
+);
