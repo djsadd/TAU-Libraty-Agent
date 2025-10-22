@@ -79,22 +79,64 @@ function Html({ html }: { html: string }) {
   return <div className="ai-html" dangerouslySetInnerHTML={{ __html: clean }} />;
 }
 
-function BookCard({ book }: { book: Msg['books'][0] }) {
+function BookCard({
+  book,
+  onOpen,
+}: {
+  book: Msg['books'][0];
+  onOpen: (b: Msg['books'][0]) => void;
+}) {
   return (
-    <div className="book-card">
-      {book.cover && <img src={book.cover} alt={book.title} className="book-cover" />}
+    <button className="book-card" onClick={() => onOpen(book)} title="Подробнее">
       <div className="book-info">
         <div className="book-title">{book.title}</div>
         {book.author && <div className="book-author">Автор: {book.author}</div>}
         {book.year && <div className="book-year">{book.year} г.</div>}
-        {book.description && (
-          <div className="book-desc">{book.description}</div>
-        )}
+        {book.description && <div className="book-desc">{book.description}</div>}
+      </div>
+    </button>
+  );
+}
+
+function Modal({
+  open,
+  onClose,
+  book,
+}: {
+  open: boolean;
+  onClose: () => void;
+  book?: Msg['books'][0];
+}) {
+  if (!open || !book) return null;
+  return (
+    <div className="modal" onClick={onClose}>
+      <div
+        className="modal-dialog"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="modal-header">
+          <h3 className="modal-title">{book.title}</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
+        </div>
+        <div className="modal-body">
+          {book.author && <p><b>Автор:</b> {book.author}</p>}
+          {book.year && <p><b>Год:</b> {book.year}</p>}
+          {book.description && (
+            <>
+              <hr/>
+              <p style={{whiteSpace:'pre-wrap'}}>{book.description}</p>
+            </>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose}>Закрыть</button>
+        </div>
       </div>
     </div>
   );
 }
-
 
 export default function App(): JSX.Element {
   const [apiUrl, setApiUrl] = useState<string>(DEFAULT_API);
@@ -110,6 +152,12 @@ export default function App(): JSX.Element {
   const chatRef = useRef<HTMLDivElement | null>(null);
 
   // Генерация уникального sessionId для пользователя
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelected(undefined); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
   useEffect(() => {
     let id = sessionStorage.getItem('sessionId');
     if (!id) {
@@ -223,33 +271,10 @@ export default function App(): JSX.Element {
   return (
     <div className="container">
       <div className="app">
-        <div className="hdr">
-          <div className="brand">
-            <div className="logo" />
-            <div>
-              <div className="title">AI Чат по книгам</div>
-              <div className="status">
-                ИИ модель: {error ? <span className="pill err">ошибка</span> : <span className="pill ok">готова</span>}
-              </div>
-            </div>
-          </div>
-          <div className="toolbar">
-            <span className="chip">K документов</span>
-            <input className="number" type="number" min={0} max={50} value={k}
-                   onChange={e => setK(Number(e.currentTarget.value))} />
-            <button className="btn" onClick={clearChat} title="Очистить">Очистить</button>
-          </div>
-        </div>
+        {/* ... hdr ... */}
 
         <div className="chat" ref={chatRef}>
-          {messages.length === 0 && !loading && (
-            <div className="group assistant">
-              <div className="meta">Бот • {new Date().toLocaleTimeString()}</div>
-              <div className="bubble">
-                Задайте вопрос по содержимому загруженных книг. Например: «Где в книге по менеджменту есть про KPI?»
-              </div>
-            </div>
-          )}
+          {/* ... пустой старт ... */}
 
           {messages.map((m, i) => (
             <div className={`group ${m.role}`} key={m.t + ':' + i}>
@@ -259,7 +284,9 @@ export default function App(): JSX.Element {
                   <>
                     {m.books && m.books.length > 0 && (
                       <div className="book-list">
-                        {m.books.map((b, j) => <BookCard key={j} book={b} />)}
+                        {m.books.map((b, j) => (
+                          <BookCard key={j} book={b} onOpen={setSelected} />
+                        ))}
                       </div>
                     )}
                     <Html html={m.content} />
@@ -267,7 +294,6 @@ export default function App(): JSX.Element {
                 ) : (
                   <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{m.content}</pre>
                 )}
-
               </div>
             </div>
           ))}
@@ -275,23 +301,11 @@ export default function App(): JSX.Element {
           {loading && <div className="skeleton" />}
         </div>
 
-        <div className="row">
-          <textarea
-            className="textarea"
-            rows={2}
-            placeholder="Сформулируйте вопрос… (Enter — отправить, Shift+Enter — перенос строки)"
-            value={question}
-            onChange={e => setQuestion(e.currentTarget.value)}
-            onKeyDown={onKeyDown}
-          />
-          <button className="btn" onClick={() => void send()} disabled={!canSend}>
-            {loading ? 'Отправка…' : 'Отправить'}
-          </button>
-        </div>
-        <div className="footer">
-          <span className="chip">Департамент цифровой трансформации</span>
-        </div>
+        {/* ... input row & footer ... */}
       </div>
+
+      {/* МОДАЛКА */}
+      <Modal open={!!selected} onClose={() => setSelected(undefined)} book={selected} />
     </div>
   );
 }
