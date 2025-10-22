@@ -78,7 +78,6 @@ function Html({ html }: { html: string }) {
 
   return <div className="ai-html" dangerouslySetInnerHTML={{ __html: clean }} />;
 }
-
 function BookCard({
   book,
   onOpen,
@@ -98,6 +97,7 @@ function BookCard({
   );
 }
 
+// Простая модалка
 function Modal({
   open,
   onClose,
@@ -145,6 +145,7 @@ export default function App(): JSX.Element {
   const [question, setQuestion] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+const [selected, setSelected] = useState<Msg['books'][0] | undefined>();
   const [messages, setMessages] = useState<Msg[]>(() => {
     const saved = localStorage.getItem('messages');
     return saved ? (JSON.parse(saved) as Msg[]) : [];
