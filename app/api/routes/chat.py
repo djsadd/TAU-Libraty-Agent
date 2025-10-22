@@ -185,7 +185,7 @@ async def chat(req: ChatRequest,
             RunnableParallel(
                 question=RunnablePassthrough(),
                 context=lambda q: clean_context(vs_tool(q, req.k or 5)),  # применяем фильтр тут
-                books=lambda q: bs_tool(q, 10),
+                books=lambda q: "",  # отключаем book_search
             )
             | prompt
             | llm
