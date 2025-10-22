@@ -40,14 +40,16 @@ function Html({ html }: { html: string }) {
     // Санитизация
     const purified = DOMPurify.sanitize(content, {
       ALLOWED_TAGS: [
-        'b', 'strong', 'i', 'em', 'u', 's', 'sup', 'sub',
-        'p', 'br', 'hr', 'blockquote', 'code', 'pre', 'span',
-        'ul', 'ol', 'li', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
-        'img', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'
+        'b','strong','i','em','u','s','sup','sub',
+        'p','br','hr','blockquote','code','pre','span',
+        'ul','ol','li','table','thead','tbody','tr','th','td',
+        'a','h1','h2','h3','h4','h5','h6'
       ],
-      ALLOWED_ATTR: ['href', 'title', 'target', 'rel', 'src', 'alt', 'colspan', 'rowspan'],
+      ALLOWED_ATTR: ['href','title','target','rel','colspan','rowspan'],
+      FORBID_TAGS: ['img'],          // 👈 гарантированно вырежет картинки
       RETURN_TRUSTED_TYPE: false,
     });
+
 
     const tmp = document.createElement('div');
     tmp.innerHTML = purified;

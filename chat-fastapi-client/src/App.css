@@ -24,45 +24,37 @@ html, body {
   display: flex;
   justify-content: center;
 }
-
-
 .book-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* по 3 карточки в строке */
-  gap: 0.8rem; /* немного меньшее расстояние */
-  justify-items: center;
-  margin: 1rem 0;
+  grid-template-columns: repeat(3, 1fr); /* 3 карточки на строку */
+  gap: 0.8rem;
+  justify-items: stretch; /* карточки растянутся равномерно */
 }
 
 .book-card {
   width: 100%;
-  max-width: 160px;   /* было 190 */
-  height: 220px;      /* немного меньше */
+  height: 220px;
+  max-width: none;       /* убираем ограничение в px */
   border-radius: 12px;
-  overflow: hidden;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-  transition: all 0.25s ease;
-  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
 }
 
-.book-cover {
-  width: 100%;
-  height: 90px; /* ниже прежнего 120px */
-  object-fit: cover;
+.book-cover { height: 90px; object-fit: cover; }
+
+.book-title { font-size: .85rem; height: 2.2em; }
+.book-author, .book-year, .book-desc { font-size: .72rem; }
+
+/* адаптив */
+@media (max-width: 700px) {
+  .book-list { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 450px) {
+  .book-list { grid-template-columns: 1fr; }
 }
 
-.book-title {
-  font-size: 0.8rem;
-  height: 2.2em;
-}
 
-.book-author,
-.book-year,
-.book-desc {
-  font-size: 0.7rem;
-}@media (max-width: 700px) {
+
+@media (max-width: 700px) {
   .book-list {
     grid-template-columns: repeat(2, 1fr); /* 2 на строку */
   }
