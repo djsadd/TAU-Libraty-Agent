@@ -140,7 +140,6 @@ async def chat(req: ChatRequest,
 
     session_id = req.sessionId or "anonymous"
 
-    # Выполняем LLM
     vs_tool_used = []
     bs_tool_used = []
 
@@ -154,59 +153,72 @@ async def chat(req: ChatRequest,
             status_code=429
         )
 
-    # Обновляем время последнего запроса
     _last_request_time[session_id] = now
 
-    # Определяем инструменты
+    # Инструменты
     vs_tool = lambda q, k=5: (vs_tool_used.append("vector_search") or vector_search.func(q, k, retriever=retriever))
     bs_tool = lambda q, k=10: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
 
-    # Промпт
+    # Общий системный промпт
+    system_prompt = (
+        "Ты — интеллектуальный помощник по поиску информации в книгах университета «Туран-Астана».\n"
+        "Отвечай строго на основании текста из раздела «Контекст», где указаны книги и страницы.\n"
+        "Каждый факт или вывод обязательно сопровождай ссылкой на источник в формате:\n"
+        "«(<i>название книги</i>, стр. N)».\n"
+        "Если информации нет — честно сообщай: "
+        "«В доступных источниках университета Туран-Астана информации нет.»\n"
+        "Форматируй ответ в HTML с использованием тегов (<p>, <ul>, <li>, <b>, <i>).\n"
+        "Не выдумывай книги и страницы, используй только те, что указаны в разделе «Контекст»."
+    )
+
     prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            "Ты — интеллектуальный помощник по поиску информации в книгах университета «Туран-Астана».\n"
-            "Отвечай строго на основании текста из раздела «Контекст», где указаны книги и страницы.\n"
-            "Каждый факт или вывод обязательно сопровождай ссылкой на источник в формате:\n"
-            "«(<i>название книги</i>, стр. N)».\n"
-            "Если информации нет — честно сообщай: "
-            "«В доступных источниках университета Туран-Астана информации нет.»\n"
-            "Форматируй ответ в HTML с использованием тегов (<p>, <ul>, <li>, <b>, <i>).\n"
-            "Не выдумывай книги и страницы, используй только те, что указаны в разделе «Контекст»."
-        ),
+        ("system", system_prompt),
         (
             "human",
             "Вопрос студента: {question}\n\n"
             "Контекст (текстовые фрагменты с указанием книги и страницы):\n{context}"
-        )
+        ),
     ])
 
-    # Теперь добавляем комбинированный контекст (vector_search + book_search)
-    def get_combined_context(q: str):
-        vs_context = clean_context(vs_tool(q, req.k or 5))
-        bs_context = clean_context(bs_tool(q, req.k or 10))
-        return f"{vs_context}\n\n{bs_context}"
-
-    chain = (
+    # --- 1️⃣ Первый запрос — через vector_search ---
+    vector_chain = (
         RunnableParallel(
             question=RunnablePassthrough(),
-            context=lambda q: get_combined_context(q),
+            context=lambda q: clean_context(vs_tool(q, req.k or 5)),
         )
         | prompt
         | llm
     )
+    vector_answer = vector_chain.invoke(req.query).content
 
-    # Запуск LLM
-    answer = chain.invoke(req.query)
+    # --- 2️⃣ Второй запрос — через book_search ---
+    book_chain = (
+        RunnableParallel(
+            question=RunnablePassthrough(),
+            context=lambda q: clean_context(bs_tool(q, req.k or 10)),
+        )
+        | prompt
+        | llm
+    )
+    book_answer = book_chain.invoke(req.query).content
 
-    # Сохраняем в БД
+    # --- 3️⃣ Объединяем ответы ---
+    final_answer = (
+        "<h3>Ответ по внутренним источникам (векторный поиск):</h3>\n"
+        f"{vector_answer}\n"
+        "<hr>"
+        "<h3>Ответ по книгам библиотеки:</h3>\n"
+        f"{book_answer}"
+    )
+
+    # --- 4️⃣ Сохраняем в БД ---
     save_chat_history(
         db=db,
         session_id=session_id,
         question=req.query,
-        answer=answer.content,
-        tools_used=list(set(vs_tool_used + bs_tool_used))
+        answer=final_answer,
+        tools_used=list(set(vs_tool_used + bs_tool_used)),
     )
 
-    return {"reply": answer.content}
+    return {"reply": final_answer}
 
