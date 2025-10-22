@@ -1,5 +1,6 @@
 // src/App.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import DOMPurify from 'dompurify';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -78,15 +79,9 @@ function Html({ html }: { html: string }) {
 
   return <div className="ai-html" dangerouslySetInnerHTML={{ __html: clean }} />;
 }
-function BookCard({
-  book,
-  onOpen,
-}: {
-  book: Msg['books'][0];
-  onOpen: (b: Msg['books'][0]) => void;
-}) {
+function BookCard({ book, onOpen }: { book: Msg['books'][0]; onOpen: (b: Msg['books'][0]) => void }) {
   return (
-    <button className="book-card" onClick={() => onOpen(book)} title="Подробнее">
+     <button type="button" className="book-card" onClick={() => onOpen(book)} title="Подробнее">
       <div className="book-info">
         <div className="book-title">{book.title}</div>
         {book.author && <div className="book-author">Автор: {book.author}</div>}
@@ -96,8 +91,6 @@ function BookCard({
     </button>
   );
 }
-
-// Простая модалка
 function Modal({
   open,
   onClose,
@@ -107,8 +100,25 @@ function Modal({
   onClose: () => void;
   book?: Msg['books'][0];
 }) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  if (!mountRef.current) mountRef.current = document.createElement('div');
+
+  // монтируем контейнер в body
+  useEffect(() => {
+    const el = mountRef.current!;
+    document.body.appendChild(el);
+    return () => { document.body.removeChild(el); };
+  }, []);
+
+  // блокируем прокрутку подложки
+  useEffect(() => {
+    if (open) document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, [open]);
+
   if (!open || !book) return null;
-  return (
+
+  return createPortal(
     <div className="modal" onClick={onClose}>
       <div
         className="modal-dialog"
@@ -118,23 +128,19 @@ function Modal({
       >
         <div className="modal-header">
           <h3 className="modal-title">{book.title}</h3>
-          <button className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Закрыть">×</button>
         </div>
         <div className="modal-body">
           {book.author && <p><b>Автор:</b> {book.author}</p>}
           {book.year && <p><b>Год:</b> {book.year}</p>}
-          {book.description && (
-            <>
-              <hr/>
-              <p style={{whiteSpace:'pre-wrap'}}>{book.description}</p>
-            </>
-          )}
+          {book.description && (<><hr/><p style={{whiteSpace:'pre-wrap'}}>{book.description}</p></>)}
         </div>
         <div className="modal-footer">
-          <button className="btn" onClick={onClose}>Закрыть</button>
+          <button type="button" className="btn" onClick={onClose}>Закрыть</button>
         </div>
       </div>
-    </div>
+    </div>,
+    mountRef.current
   );
 }
 
