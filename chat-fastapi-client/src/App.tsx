@@ -268,8 +268,7 @@ const [selected, setSelected] = useState<Msg['books'][0] | undefined>();
   }
 
   function clearChat(): void { setMessages([]); setError(''); }
-
- return (
+    return (
   <div className="container">
     <div className="app">
       {/* === HEADER === */}
@@ -358,3 +357,4 @@ const [selected, setSelected] = useState<Msg['books'][0] | undefined>();
     <Modal open={!!selected} onClose={() => setSelected(undefined)} book={selected} />
   </div>
 );
+}
