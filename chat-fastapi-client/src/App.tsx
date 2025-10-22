@@ -6,7 +6,20 @@ import { v4 as uuidv4 } from 'uuid';
 const DEFAULT_API = '/api/chat';
 
 type Role = 'user' | 'assistant';
-interface Msg { role: Role; content: string; t: number; error?: boolean }
+interface Msg {
+  role: Role;
+  content: string;
+  t: number;
+  error?: boolean;
+  books?: {
+    title: string;
+    author?: string;
+    year?: number;
+    cover?: string;
+    description?: string;
+  }[];
+}
+
 
 // Компонент для безопасного рендеринга HTML от LLM
 function Html({ html }: { html: string }) {
@@ -61,6 +74,22 @@ function Html({ html }: { html: string }) {
   }, [html]);
 
   return <div className="ai-html" dangerouslySetInnerHTML={{ __html: clean }} />;
+}
+
+function BookCard({ book }: { book: Msg['books'][0] }) {
+  return (
+    <div className="book-card">
+      {book.cover && <img src={book.cover} alt={book.title} className="book-cover" />}
+      <div className="book-info">
+        <div className="book-title">{book.title}</div>
+        {book.author && <div className="book-author">Автор: {book.author}</div>}
+        {book.year && <div className="book-year">{book.year} г.</div>}
+        {book.description && (
+          <div className="book-desc">{book.description}</div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 
@@ -144,7 +173,31 @@ export default function App(): JSX.Element {
     // Убираем лишние переводы
     reply = reply.replace(/\n{3,}/g, '\n\n');
 
-    setMessages(prev => [...prev, { role: 'assistant', content: reply, t: Date.now() }]);
+        // 💡 Пока API не возвращает книги — используем мок-данные
+    const mockBooks = [
+      {
+        title: 'Менеджмент. Основы и практика',
+        author: 'Питер Друкер',
+        year: 2019,
+        cover: 'https://covers.openlibrary.org/b/id/8231991-L.jpg',
+        description: 'Классическое руководство по современному менеджменту.',
+        link: '#'
+      },
+      {
+        title: 'Эффективные KPI',
+        author: 'Дэвид Парментер',
+        year: 2021,
+        cover: 'https://covers.openlibrary.org/b/id/8463021-L.jpg',
+        description: 'Практическое руководство по разработке ключевых показателей эффективности.',
+        link: '#'
+      },
+    ];
+
+    setMessages(prev => [
+      ...prev,
+      { role: 'assistant', content: reply, t: Date.now(), books: mockBooks },
+    ]);
+
   } catch (e: unknown) {
     const m = e instanceof Error ? e.message : 'Ошибка запроса';
     setError(m);
@@ -200,10 +253,18 @@ export default function App(): JSX.Element {
               <div className="meta">{m.role === 'user' ? 'Вы' : 'Бот'} • {new Date(m.t).toLocaleTimeString()}</div>
               <div className={`bubble ${m.error ? 'err' : ''}`}>
                 {m.role === 'assistant' ? (
-                  <Html html={m.content} />
+                  <>
+                    {m.books && m.books.length > 0 && (
+                      <div className="book-list">
+                        {m.books.map((b, j) => <BookCard key={j} book={b} />)}
+                      </div>
+                    )}
+                    <Html html={m.content} />
+                  </>
                 ) : (
                   <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{m.content}</pre>
                 )}
+
               </div>
             </div>
           ))}

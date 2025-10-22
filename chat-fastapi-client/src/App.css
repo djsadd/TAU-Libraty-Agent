@@ -272,3 +272,57 @@ html, body {
 .ai-table th {
   background: #f0f0f0;
 }
+.book-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.book-card {
+  display: flex;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+  width: 100%;
+  max-width: 300px;
+}
+
+.book-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.book-cover {
+  width: 90px;
+  height: 120px;
+  object-fit: cover;
+  border-right: 1px solid #ddd;
+}
+
+.book-info {
+  flex: 1;
+  padding: 0.6rem;
+  text-align: left;
+}
+
+.book-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.2rem;
+}
+
+.book-author,
+.book-year {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.book-desc {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.3rem;
+}
