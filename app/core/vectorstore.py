@@ -69,11 +69,8 @@ def get_book_retriever():
         collection_name=settings.QDRANT_TITLE_COLLECTION,
         embeddings=embeddings,
     )
-    return title_vectorstore.as_retriever(
+    retriever = title_vectorstore.as_retriever(
         search_type="similarity_score_threshold",
-        search_kwargs={
-            "score_threshold": 0.6,
-            "k": 1000  # максимум
-        }
+        search_kwargs={"score_threshold": 0.6, "k": 1000}
     )
-
+    return retriever
