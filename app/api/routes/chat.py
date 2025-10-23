@@ -156,7 +156,7 @@ async def chat(req: ChatRequest,
 
     _last_request_time[session_id] = now
 
-    # Инструменты
+    # tools
     vs_tool = lambda q, k=5: (vs_tool_used.append("vector_search") or vector_search.func(q, k, retriever=retriever))
     bs_tool = lambda q, k=10: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
 
@@ -257,9 +257,7 @@ async def chat(req: ChatRequest,
             "id_book": m.get("id_book"),
             "text_snippet": (d.page_content or "")[:500].strip()
         })
-
-    # --- Этап 2: Векторный поиск ---
-    print("📚 Поиск фрагментов через vector_search...")
+    # Vector Search
     vec_docs = retriever.invoke(req.query, config={"k": req.k or 5})
 
     vector_cards = []
@@ -272,10 +270,8 @@ async def chat(req: ChatRequest,
             "id_book": m.get("id_book"),
             "text_snippet": (d.page_content or "")[:600].strip()
         })
-    print(book_cards)
-    print(vector_cards)
 
-    # --- Этап 3: Объединяем карточки ---
+    # Concat cards
     all_cards = book_cards + vector_cards
 
     # --- Этап 4: Генерация коротких описаний (summary) для всех карточек ---
@@ -321,7 +317,7 @@ async def chat(req: ChatRequest,
 
     # --- Этап 7: Возвращаем результат ---
     return {
-        "reply": final_answer,
+        "reply": "",
         "cards": annotated_cards  # объединённые карточки
     }
 

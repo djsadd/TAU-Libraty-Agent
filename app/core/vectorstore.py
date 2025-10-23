@@ -63,14 +63,10 @@ def get_retriever(k: int | None = None):
     return vectorstore.as_retriever(search_kwargs={"k": k or settings.TOP_K})
 
 
-def get_book_retriever():
+def get_book_retriever(k: int | None = None):
     title_vectorstore = Qdrant(
         client=client,
         collection_name=settings.QDRANT_TITLE_COLLECTION,
         embeddings=embeddings,
     )
-    retriever = title_vectorstore.as_retriever(
-        search_type="similarity_score_threshold",
-        search_kwargs={"score_threshold": 0.6, "k": 1000}
-    )
-    return retriever
+    return title_vectorstore.as_retriever(search_kwargs={"k": k or settings.TOP_K})
