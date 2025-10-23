@@ -25,7 +25,7 @@ export interface AIResponse {
 }
 
 export async function fetchAIResponse(message: string): Promise<AIResponse> {
-  const apiUrl = "http://192.168.115.214:8000/api/chat_card"; // URL FastAPI
+  const apiUrl = "http://web:8000/api/chat_card"; // URL FastAPI
 
   const payload = {
     query: message,
