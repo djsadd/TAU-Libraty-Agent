@@ -69,4 +69,4 @@ def get_book_retriever(k: int | None = None):
         collection_name=settings.QDRANT_TITLE_COLLECTION,
         embeddings=embeddings,
     )
-    return title_vectorstore.as_retriever(search_kwargs={"k": k or settings.TOP_K})
+    return title_vectorstore.as_retriever(search_kwargs={"k": 150 or settings.TOP_K})
