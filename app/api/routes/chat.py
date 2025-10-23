@@ -272,6 +272,7 @@ async def chat(req: ChatRequest,
             "id_book": m.get("id_book"),
             "text_snippet": (d.page_content or "")[:600].strip()
         })
+    print(book_cards)
     print(vector_cards)
 
     # --- Этап 3: Объединяем карточки ---
