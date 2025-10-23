@@ -131,6 +131,7 @@ _last_request_time: dict[str, float] = {}
 
 RATE_LIMIT_SECONDS = 5  # интервал между запросами
 
+
 @router.post("/chat", summary="Чат с ИИ")
 async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
@@ -195,7 +196,7 @@ async def chat(req: ChatRequest,
     book_chain = (
         RunnableParallel(
             question=RunnablePassthrough(),
-            context=lambda q: clean_context(bs_tool(q, req.k or 10)),
+            context=lambda q: bs_tool(q, req.k or 10),
         )
         | prompt
         | llm
