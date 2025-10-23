@@ -47,10 +47,9 @@ services:
 
   frontend:
     build:
-      context: ./chat-fastapi-client
+      context: ./book-chat
       dockerfile: Dockerfile.frontend
-    environment:
-      - REACT_APP_API_URL=http://backend:8000/api/chat
+
     container_name: tau-frontend
     ports:
       - "80:80"
