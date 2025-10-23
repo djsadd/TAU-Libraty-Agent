@@ -29,7 +29,7 @@ export async function fetchAIResponse(message: string): Promise<AIResponse> {
 
   const payload = {
     query: message,
-    k: 10,
+    k: 100,
     sessionId: "web-client", // можно заменить на реальный sessionId
   };
 
