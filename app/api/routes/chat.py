@@ -223,6 +223,7 @@ async def chat(req: ChatRequest,
 
     return {"reply": final_answer}
 
+
 @router.post("/chat_card", summary="Чат с карточками книг")
 async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
@@ -243,12 +244,13 @@ async def chat(req: ChatRequest,
 
     # --- Этап 1: Поиск релевантных книг ---
     print("🔍 Поиск релевантных книг...")
-    docs = book_retriever.invoke(req.query, config={"k": req.k or 10})
+    book_docs = book_retriever.invoke(req.query, config={"k": req.k or 10})
 
-    cards = []
-    for d in docs:
+    book_cards = []
+    for d in book_docs:
         m = d.metadata or {}
-        cards.append({
+        book_cards.append({
+            "source": "book_search",
             "title": m.get("title", "Неизвестная книга"),
             "author": m.get("author", ""),
             "page": m.get("page"),
@@ -256,53 +258,49 @@ async def chat(req: ChatRequest,
             "text_snippet": (d.page_content or "")[:500].strip()
         })
 
-    # --- Этап 2: Генерация коротких описаний для карточек ---
-    print("🧠 Генерация описаний для карточек (book_retriever)...")
-    annotated_cards = []
-    for card in cards:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "Ты — академический помощник. Кратко (1–2 предложения) объясни, почему эта книга может помочь студенту по данному вопросу."),
-            ("human", f"Вопрос: {req.query}\n\nКнига: {card['title']}\n\nФрагмент: {card['text_snippet']}")
-        ])
-        summary = llm.invoke(prompt.format_messages()).content
-        annotated_cards.append({
-            **card,
-            "summary": summary
-        })
-
-    # --- Этап 3: Векторный поиск контекста ---
+    # --- Этап 2: Векторный поиск ---
     print("📚 Поиск фрагментов через vector_search...")
-    docs_text = retriever.invoke(req.query, config={"k": req.k or 5})
+    vec_docs = retriever.invoke(req.query, config={"k": req.k or 5})
 
-    # --- Этап 3.1: Формирование карточек для фрагментов ---
-    context_cards = []
-    for d in docs_text:
+    vector_cards = []
+    for d in vec_docs:
         m = d.metadata or {}
-        context_cards.append({
+        vector_cards.append({
+            "source": "vector_search",
             "title": m.get("title", "Неизвестный источник"),
             "page": m.get("page"),
             "id_book": m.get("id_book"),
             "text_snippet": (d.page_content or "")[:600].strip()
         })
 
-    # --- Этап 3.2: Генерация кратких описаний для контекстных карточек ---
-    print("🧠 Генерация описаний для карточек (vector_search)...")
-    annotated_context_cards = []
-    for card in context_cards:
+    # --- Этап 3: Объединяем карточки ---
+    all_cards = book_cards + vector_cards
+
+    # --- Этап 4: Генерация коротких описаний (summary) для всех карточек ---
+    print("🧠 Генерация описаний для всех карточек...")
+    annotated_cards = []
+    for card in all_cards:
+        # Формулируем prompt немного иначе для разных источников
+        system_role = (
+            "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
+            "почему этот источник может быть полезен студенту по данному вопросу."
+        )
+        human_msg = (
+            f"Вопрос: {req.query}\n\n"
+            f"Источник: {card['title']}\n\n"
+            f"Фрагмент: {card['text_snippet']}"
+        )
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "Ты — академический помощник. Объясни в 1–2 предложениях, почему этот фрагмент может быть полезен для ответа на вопрос."),
-            ("human", f"Вопрос: {req.query}\n\nИсточник: {card['title']}\n\nФрагмент: {card['text_snippet']}")
+            ("system", system_role),
+            ("human", human_msg)
         ])
         summary = llm.invoke(prompt.format_messages()).content
-        annotated_context_cards.append({
-            **card,
-            "summary": summary
-        })
+        annotated_cards.append({**card, "summary": summary})
 
-    # --- Этап 4: Формирование финального ответа LLM ---
+    # --- Этап 5: Формирование финального ответа LLM ---
     context = "\n\n".join([
         f"[{d.metadata.get('title', '')}] {clean_context(d.page_content[:800])}"
-        for d in docs_text
+        for d in vec_docs
     ])
     text_prompt = ChatPromptTemplate.from_messages([
         ("system", "Ты — интеллектуальный помощник университета Туран-Астана. Отвечай строго по контексту."),
@@ -310,7 +308,7 @@ async def chat(req: ChatRequest,
     ])
     final_answer = llm.invoke(text_prompt.format_messages()).content
 
-    # --- Этап 5: Сохраняем историю ---
+    # --- Этап 6: Сохраняем историю ---
     save_chat_history(
         db=db,
         session_id=session_id,
@@ -319,10 +317,10 @@ async def chat(req: ChatRequest,
         tools_used=["book_search", "vector_search"]
     )
 
-    # --- Этап 6: Возвращаем результат ---
+    # --- Этап 7: Возвращаем результат ---
     return {
         "reply": final_answer,
-        "cards": annotated_cards,              # карточки по книгам
-        "context_cards": annotated_context_cards  # карточки по найденным фрагментам
+        "cards": annotated_cards  # объединённые карточки
     }
+
 
