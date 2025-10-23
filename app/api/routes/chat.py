@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from ...deps import get_retriever_dep, get_llm, get_book_retriever_dep
 from app.models.chat import ChatHistory
-router = APIRouter(prefix="/api", tags=["chat"])
+router = APIRouter(prefix="/api", tags=["chat", "chat_card"])
 from app.core.db import SessionLocal
 import re
 
@@ -222,4 +222,79 @@ async def chat(req: ChatRequest,
     )
 
     return {"reply": final_answer}
+
+
+@router.post("/chat_card", summary="Чат с карточками книг")
+async def chat(req: ChatRequest,
+               retriever=Depends(get_retriever_dep),
+               book_retriever=Depends(get_book_retriever_dep),
+               llm=Depends(get_llm),
+               db: Session = Depends(get_db)):
+
+    session_id = req.sessionId or "anonymous"
+
+    now = time.time()
+    last_time = _last_request_time.get(session_id, 0)
+    if now - last_time < RATE_LIMIT_SECONDS:
+        return JSONResponse(
+            {"error": f"Слишком частые запросы. Попробуйте через {int(RATE_LIMIT_SECONDS - (now - last_time))} сек."},
+            status_code=429
+        )
+    _last_request_time[session_id] = now
+
+    # --- Этап 1: Поиск книг ---
+    print("🔍 Поиск релевантных книг...")
+    docs = book_retriever.invoke(req.query, config={"k": req.k or 10})
+
+    # Превращаем документы в карточки
+    cards = []
+    for d in docs:
+        m = d.metadata or {}
+        cards.append({
+            "title": m.get("title", "Неизвестная книга"),
+            "author": m.get("author", ""),
+            "page": m.get("page"),
+            "id_book": m.get("id_book"),
+            "text_snippet": (d.page_content or "")[:500].strip()
+        })
+
+    # --- Этап 2: Для каждой карточки — короткое описание от LLM ---
+    print("🧠 Генерация описаний для карточек...")
+    annotated_cards = []
+    for card in cards:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "Ты — академический помощник. Дай 1–2 предложения, почему эта книга может быть полезна студенту по данному вопросу."),
+            ("human", f"Вопрос: {req.query}\n\nКнига: {card['title']}\n\nФрагмент: {card['text_snippet']}")
+        ])
+        summary = llm.invoke(prompt.format_messages()).content
+        annotated_cards.append({
+            **card,
+            "summary": summary
+        })
+
+    # --- Этап 3: Векторный ответ по тексту ---
+    print("📚 Поиск фрагментов через vector_search...")
+    docs_text = retriever.invoke(req.query, config={"k": req.k or 5})
+    context = "\n\n".join([f"[{d.metadata.get('title', '')}] {clean_context(d.page_content[:800])}" for d in docs_text])
+
+    text_prompt = ChatPromptTemplate.from_messages([
+        ("system", "Ты — интеллектуальный помощник университета Туран-Астана. Отвечай строго по контексту."),
+        ("human", f"Вопрос студента: {req.query}\n\nКонтекст:\n{context}")
+    ])
+    final_answer = llm.invoke(text_prompt.format_messages()).content
+
+    # --- Этап 4: Сохраняем в историю ---
+    save_chat_history(
+        db=db,
+        session_id=session_id,
+        question=req.query,
+        answer=final_answer,
+        tools_used=["book_search", "vector_search"]
+    )
+
+    # --- Этап 5: Возвращаем результат ---
+    return {
+        "reply": final_answer,
+        "cards": annotated_cards  # для фронтенда
+    }
 
