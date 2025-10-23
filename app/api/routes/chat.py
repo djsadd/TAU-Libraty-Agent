@@ -317,7 +317,7 @@ async def chat(req: ChatRequest,
 
     # --- Этап 7: Возвращаем результат ---
     return {
-        "reply": "",
+        "reply": "Найдено в следующих книгах:",
         "cards": annotated_cards  # объединённые карточки
     }
 
