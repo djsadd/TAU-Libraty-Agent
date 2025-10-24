@@ -242,14 +242,21 @@ async def chat(req: ChatRequest,
         )
     _last_request_time[session_id] = now
 
-    print("🔍 Поиск релевантных книг...")
     book_docs = book_retriever.invoke(req.query, config={"k": 10})
     id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
     with SessionLocal() as session:
         kabis_records = session.query(Kabis).filter(Kabis.id_book.in_(id_books)).all()
-        kabis_map = {k.id_book: k for k in kabis_records}
-    print(kabis_records)
-    print(kabis_map)
+        kb_map = [
+            {
+                "Language": k.lang,
+                "title": k.author + " " + k.title,
+                "pub_info": k.pubinfo,
+                "year": k.year,
+                "subjects": k.subjects
+            }
+            for k in kabis_records
+        ]
+
     book_cards = []
     for d in book_docs:
         m = d.metadata or {}
@@ -261,9 +268,9 @@ async def chat(req: ChatRequest,
             "id_book": m.get("id_book"),
             "text_snippet": (d.page_content or "")[:500].strip()
         })
+
     # Vector Search
     vec_docs = retriever.invoke(req.query, config={"k": req.k or 5})
-
     vector_cards = []
     for d in vec_docs:
         m = d.metadata or {}
@@ -275,10 +282,7 @@ async def chat(req: ChatRequest,
             "text_snippet": (d.page_content or "")[:600].strip()
         })
 
-    # Concat cards
-    # --- Этап 4: Генерация коротких описаний (summary) для всех карточек ---
-    print("🧠 Генерация описаний для всех карточек...")
-    annotated_cards = [] + book_cards
+    annotated_cards = [] + kb_map
     for card in vector_cards:
         system_role = (
             "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
