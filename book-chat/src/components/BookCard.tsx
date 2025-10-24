@@ -24,6 +24,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => {
             {book.author && <p className="text-gray-600 text-xs">{book.author}</p>}
             {book.pub_info && <p className="text-gray-500 text-xs">{book.pub_info}</p>}
             {book.year && <p className="text-gray-500 text-xs">{book.year}</p>}
+            {book.year && <p className="text-gray-500 text-xs">{book.lang}</p>}
           </>
         )}
 
