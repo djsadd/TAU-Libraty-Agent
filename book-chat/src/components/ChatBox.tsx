@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
-import type { Book } from "../utils/aiClient";
 import { BookCard } from "./BookCard";
 import { BookModal } from "./BookModal";
 
