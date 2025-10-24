@@ -62,7 +62,7 @@ def get_title_retriever(k: int | None = None):
 def get_retriever(k: int | None = None, score_threshold: float = 0.7):
     return vectorstore.as_retriever(
         search_kwargs={
-            "k": k or settings.TOP_K,
+            "k": 50,
             "score_threshold": 0.5
         }
     )
