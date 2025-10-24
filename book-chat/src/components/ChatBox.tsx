@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
 
+// --- Типы ---
 interface Book {
   title: string;
   author?: string;
@@ -54,9 +55,7 @@ const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({
     className="border rounded-xl p-2 cursor-pointer bg-gray-50 hover:bg-blue-50 transition"
   >
     <div className="text-sm font-semibold truncate">{book.title}</div>
-    {book.page && (
-      <div className="text-xs text-gray-500">Стр. {book.page}</div>
-    )}
+    {book.page && <div className="text-xs text-gray-500">Стр. {book.page}</div>}
     {book.text_snippet && (
       <div className="text-xs text-gray-400 line-clamp-2">
         {book.text_snippet}
@@ -106,11 +105,19 @@ const BookModal: React.FC<{
   </div>
 );
 
+// --- Основной компонент чата ---
 export const ChatBox: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+
+  // Состояния для "Загрузить ещё"
+  const [visibleBookCount, setVisibleBookCount] = useState(9);
+  const [visibleVectorCount, setVisibleVectorCount] = useState(9);
+
+  const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
+  const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -132,6 +139,9 @@ export const ChatBox: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, aiMsg]);
+      // сбрасываем видимость при новом ответе
+      setVisibleBookCount(9);
+      setVisibleVectorCount(9);
     } catch (err) {
       console.error(err);
     } finally {
@@ -181,14 +191,27 @@ export const ChatBox: React.FC = () => {
                     Релевантные книги (векторный поиск)
                   </h4>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {msg.vector_search.map((book, j) => (
-                      <VectorCard
-                        key={j}
-                        book={book}
-                        onClick={() => setSelectedBook(book)}
-                      />
-                    ))}
+                    {msg.vector_search
+                      .slice(0, visibleVectorCount)
+                      .map((book, j) => (
+                        <VectorCard
+                          key={j}
+                          book={book}
+                          onClick={() => setSelectedBook(book)}
+                        />
+                      ))}
                   </div>
+
+                  {msg.vector_search.length > visibleVectorCount && (
+                    <div className="flex justify-center mt-2">
+                      <button
+                        onClick={loadMoreVectors}
+                        className="text-xs px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                      >
+                        Загрузить ещё
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -199,14 +222,27 @@ export const ChatBox: React.FC = () => {
                     Найдено в базе книг
                   </h4>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {msg.book_search.map((book, j) => (
-                      <BookCard
-                        key={j}
-                        book={book}
-                        onClick={() => setSelectedBook(book)}
-                      />
-                    ))}
+                    {msg.book_search
+                      .slice(0, visibleBookCount)
+                      .map((book, j) => (
+                        <BookCard
+                          key={j}
+                          book={book}
+                          onClick={() => setSelectedBook(book)}
+                        />
+                      ))}
                   </div>
+
+                  {msg.book_search.length > visibleBookCount && (
+                    <div className="flex justify-center mt-2">
+                      <button
+                        onClick={loadMoreBooks}
+                        className="text-xs px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                      >
+                        Загрузить ещё
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -242,6 +278,7 @@ export const ChatBox: React.FC = () => {
         </form>
       </div>
 
+      {/* Модальное окно книги */}
       {selectedBook && (
         <BookModal
           book={selectedBook}
