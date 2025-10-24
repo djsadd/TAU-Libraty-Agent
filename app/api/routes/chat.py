@@ -6,7 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_core.tools import tool
 from sqlalchemy.orm import Session
-
+from app.models.kabis import Kabis
 import time
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -158,7 +158,7 @@ async def chat(req: ChatRequest,
 
     # tools
     vs_tool = lambda q, k=5: (vs_tool_used.append("vector_search") or vector_search.func(q, k, retriever=retriever))
-    bs_tool = lambda q, k=10: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
+    bs_tool = lambda q, k=100: (bs_tool_used.append("book_search") or book_search.func(q, k, retriever=book_retriever))
 
     # Общий системный промпт
     system_prompt = (
@@ -196,7 +196,7 @@ async def chat(req: ChatRequest,
     book_chain = (
         RunnableParallel(
             question=RunnablePassthrough(),
-            context=lambda q: bs_tool(q, req.k or 10),
+            context=lambda q: bs_tool(q, req.k or 100),
         )
         | prompt
         | llm
@@ -244,7 +244,12 @@ async def chat(req: ChatRequest,
 
     print("🔍 Поиск релевантных книг...")
     book_docs = book_retriever.invoke(req.query, config={"k": 10})
-
+    id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
+    with SessionLocal() as session:
+        kabis_records = session.query(Kabis).filter(Kabis.id_book.in_(id_books)).all()
+        kabis_map = {k.id_book: k for k in kabis_records}
+    print(kabis_records)
+    print(kabis_map)
     book_cards = []
     for d in book_docs:
         m = d.metadata or {}
@@ -271,8 +276,6 @@ async def chat(req: ChatRequest,
         })
 
     # Concat cards
-    all_cards = book_cards + vector_cards
-
     # --- Этап 4: Генерация коротких описаний (summary) для всех карточек ---
     print("🧠 Генерация описаний для всех карточек...")
     annotated_cards = [] + book_cards
