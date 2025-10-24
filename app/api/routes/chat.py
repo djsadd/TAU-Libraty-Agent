@@ -225,7 +225,6 @@ async def chat(req: ChatRequest,
     return {"reply": final_answer}
 
 
-
 async def summarize_card(llm, req, card):
     system_role = (
         "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
@@ -273,7 +272,8 @@ async def chat(req: ChatRequest,
                 "title": f"{k.author} {k.title}",
                 "pub_info": k.pub_info,
                 "year": k.year,
-                "subjects": k.subjects
+                "subjects": k.subjects,
+                "source": "book_search"
             }
             for k in kabis_records
         ]
