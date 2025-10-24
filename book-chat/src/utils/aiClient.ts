@@ -1,20 +1,32 @@
-export interface Book {
+export interface BookCard {
+  source: "book_search";
   title: string;
   author?: string;
   pub_info?: string;
   year?: string;
+  subjects?: string;
+  lang?: string;
   id_book?: string;
   text_snippet?: string;
   summary?: string;
   cover?: string;
-  source?: string; // добавляем источник: "book_search" или "vector_search"
 }
 
+export interface VectorCard {
+  source: "vector_search";
+  title: string;
+  id_book?: string;
+  page?: string | null;
+  text_snippet?: string;
+  summary?: string;
+}
+
+export type Card = BookCard | VectorCard;
+
 export interface AIResponse {
-  reply: string; // текст от LLM
-  vector_search?: Book[]; // результаты из векторного поиска
-  book_search?: Book[]; // результаты из базы книг
-  cards?: Book[]; // поддержка старого поля (чтобы не падало)
+  reply: string;
+  book_cards?: BookCard[];
+  vector_cards?: VectorCard[];
 }
 
 

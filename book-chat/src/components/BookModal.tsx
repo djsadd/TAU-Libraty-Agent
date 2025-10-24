@@ -1,11 +1,10 @@
 // src/components/BookModal.tsx
 import React from "react";
-import type { Book } from "../utils/aiClient";
+import type { Card } from "../utils/aiClient";
 
 interface BookModalProps {
-  book: Book;
+  book: Card;
   onClose: () => void;
-  aiComment?: string; // ← добавлено для текста LLM
 }
 
 export const BookModal: React.FC<BookModalProps> = ({ book, onClose }) => (
@@ -18,7 +17,8 @@ export const BookModal: React.FC<BookModalProps> = ({ book, onClose }) => (
         ✕
       </button>
 
-      {book.cover && (
+      {/* Картинка (если есть) */}
+      {"cover" in book && book.cover && (
         <img
           src={book.cover}
           alt={book.title}
@@ -27,11 +27,23 @@ export const BookModal: React.FC<BookModalProps> = ({ book, onClose }) => (
       )}
 
       <h2 className="text-2xl font-bold mb-1">{book.title}</h2>
-      <p className="text-gray-600 mb-3 text-sm">{book.author}</p>
-      <p className="text-gray-600 mb-3 text-sm">{book.pub_info}</p>
-      <p className="text-gray-600 mb-3 text-sm">{book.subjects}</p>
-      <p className="text-gray-600 mb-3 text-sm">{book.year}</p>
-      <p className="text-gray-600 mb-3 text-sm">{book.lang}</p>
+
+      {/* --- Разделяем логику по типу источника --- */}
+      {book.source === "book_search" && (
+        <>
+          <p className="text-gray-600 text-sm mb-2">{book.author}</p>
+          {book.pub_info && <p className="text-gray-600 text-sm mb-2">{book.pub_info}</p>}
+          {book.subjects && <p className="text-gray-600 text-sm mb-2">{book.subjects}</p>}
+          {book.year && <p className="text-gray-600 text-sm mb-2">Год: {book.year}</p>}
+          {book.lang && <p className="text-gray-600 text-sm mb-2">Язык: {book.lang}</p>}
+        </>
+      )}
+
+      {book.source === "vector_search" && (
+        <p className="text-gray-500 text-sm mb-3">
+          Источник: результат поиска по контексту
+        </p>
+      )}
 
       {book.summary && (
         <div className="text-gray-800 text-sm mb-4 leading-relaxed">
@@ -44,18 +56,6 @@ export const BookModal: React.FC<BookModalProps> = ({ book, onClose }) => (
           {book.text_snippet}
         </blockquote>
       )}
-
-      {/* {aiComment && (
-        <div className="border-t pt-3 mt-4 text-gray-700 text-sm">
-          <h3 className="font-semibold mb-1 text-blue-600">Комментарий ИИ:</h3>
-          <div
-            className="prose prose-sm"
-            dangerouslySetInnerHTML={{
-              __html: aiComment.replace(/\n/g, "<br>"),
-            }}
-          />
-        </div>
-      )} */}
 
       <div className="text-right mt-5">
         <button
