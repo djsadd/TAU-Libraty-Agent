@@ -28,6 +28,10 @@ export const BookModal: React.FC<BookModalProps> = ({ book, onClose }) => (
 
       <h2 className="text-2xl font-bold mb-1">{book.title}</h2>
       <p className="text-gray-600 mb-3 text-sm">{book.author}</p>
+      <p className="text-gray-600 mb-3 text-sm">{book.pub_info}</p>
+      <p className="text-gray-600 mb-3 text-sm">{book.subjects}</p>
+      <p className="text-gray-600 mb-3 text-sm">{book.year}</p>
+      <p className="text-gray-600 mb-3 text-sm">{book.lang}</p>
 
       {book.summary && (
         <div className="text-gray-800 text-sm mb-4 leading-relaxed">

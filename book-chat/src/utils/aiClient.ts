@@ -4,6 +4,9 @@ export interface Book {
   title: string;
   author: string;
   pub_info: string;
+  year: string;
+  subjects: string;
+  lang: string;
   page?: string | null;
   id_book: string;
   text_snippet?: string;
