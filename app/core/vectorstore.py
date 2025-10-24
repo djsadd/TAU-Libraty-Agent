@@ -63,10 +63,15 @@ def get_retriever(k: int | None = None):
     return vectorstore.as_retriever(search_kwargs={"k": k or settings.TOP_K})
 
 
-def get_book_retriever(k: int | None = None):
+def get_book_retriever(score_threshold: float = 0.7):
     title_vectorstore = Qdrant(
         client=client,
         collection_name=settings.QDRANT_TITLE_COLLECTION,
         embeddings=embeddings,
     )
-    return title_vectorstore.as_retriever(search_kwargs={"k": 10 or settings.TOP_K})
+    return title_vectorstore.as_retriever(
+        search_kwargs={
+            "k": 1000,  # Максимальное количество
+            "score_threshold": score_threshold  # Порог релевантности
+        }
+    )
