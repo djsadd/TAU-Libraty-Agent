@@ -72,6 +72,6 @@ def get_book_retriever(score_threshold: float = 0.7):
     return title_vectorstore.as_retriever(
         search_kwargs={
             "k": 1000,  # Максимальное количество
-            "score_threshold": score_threshold  # Порог релевантности
+            "score_threshold": 0.4  # Порог релевантности
         }
     )
