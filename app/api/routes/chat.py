@@ -250,7 +250,7 @@ async def chat(req: ChatRequest,
             {
                 "Language": k.lang,
                 "title": k.author + " " + k.title,
-                "pub_info": k.pubinfo,
+                "pub_info": k.pub_info,
                 "year": k.year,
                 "subjects": k.subjects
             }

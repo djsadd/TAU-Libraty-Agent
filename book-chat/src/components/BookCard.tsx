@@ -20,6 +20,7 @@ export const BookCard: React.FC<BookCardProps> = ({ book, onClick }) => (
     <div className="mt-1 text-xs text-center">
       <p className="font-semibold truncate">{book.title}</p>
       <p className="text-gray-500 truncate">{book.author}</p>
+      <p className="text-gray-500 truncate">{book.pub_info}</p>
 
       {/* краткое описание */}
       {book.source && (
