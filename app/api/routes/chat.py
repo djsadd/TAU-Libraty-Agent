@@ -223,7 +223,6 @@ async def chat(req: ChatRequest,
 
     return {"reply": final_answer}
 
-
 @router.post("/chat_card", summary="Чат с карточками книг")
 async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
@@ -242,6 +241,7 @@ async def chat(req: ChatRequest,
         )
     _last_request_time[session_id] = now
 
+    # --- BOOK SEARCH ---
     book_docs = book_retriever.invoke(req.query, config={"k": 10})
     id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
     with SessionLocal() as session:
@@ -249,7 +249,7 @@ async def chat(req: ChatRequest,
         kb_map = [
             {
                 "Language": k.lang,
-                "title": k.author + " " + k.title,
+                "title": f"{k.author} {k.title}",
                 "pub_info": k.pub_info,
                 "year": k.year,
                 "subjects": k.subjects
@@ -269,7 +269,7 @@ async def chat(req: ChatRequest,
             "text_snippet": (d.page_content or "")[:500].strip()
         })
 
-    # Vector Search
+    # --- VECTOR SEARCH ---
     vec_docs = retriever.invoke(req.query, config={"k": req.k or 5})
     vector_cards = []
     for d in vec_docs:
@@ -282,7 +282,8 @@ async def chat(req: ChatRequest,
             "text_snippet": (d.page_content or "")[:600].strip()
         })
 
-    annotated_cards = [] + kb_map
+    # --- АННОТАЦИИ для vector_search ---
+    annotated_vector_cards = []
     for card in vector_cards:
         system_role = (
             "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
@@ -298,9 +299,9 @@ async def chat(req: ChatRequest,
             ("human", human_msg)
         ])
         summary = llm.invoke(prompt.format_messages()).content
-        annotated_cards.append({**card, "summary": summary})
+        annotated_vector_cards.append({**card, "summary": summary})
 
-    # --- Этап 5: Формирование финального ответа LLM ---
+    # --- Генерация основного ответа ---
     context = "\n\n".join([
         f"[{d.metadata.get('title', '')}] {clean_context(d.page_content[:800])}"
         for d in vec_docs
@@ -311,7 +312,7 @@ async def chat(req: ChatRequest,
     ])
     final_answer = llm.invoke(text_prompt.format_messages()).content
 
-    # --- Этап 6: Сохраняем историю ---
+    # --- Сохраняем историю ---
     save_chat_history(
         db=db,
         session_id=session_id,
@@ -320,10 +321,9 @@ async def chat(req: ChatRequest,
         tools_used=["book_search", "vector_search"]
     )
 
-    # --- Этап 7: Возвращаем результат ---
+    # --- Возвращаем результат отдельно ---
     return {
-        "reply": "Найдено в следующих книгах:",
-        "cards": annotated_cards  # объединённые карточки
+        "reply": "В библиотеке найдены следующие книги: ",
+        "book_search": book_cards,
+        "vector_search": annotated_vector_cards
     }
-
-

@@ -1,69 +1,54 @@
-// src/utils/aiClient.ts
-
 export interface Book {
   title: string;
   author: string;
-  pub_info: string;
-  year: string;
-  subjects: string;
-  lang: string;
+  pub_info?: string;
+  year?: string;
+  subjects?: string;
+  lang?: string;
   page?: string | null;
   id_book: string;
   text_snippet?: string;
-  summary: string;
+  summary?: string;
   cover?: string;
-  source?: string; // ✅ добавь это
-}
-
-export interface Source {
-  title?: string;
-  link?: string;
-  id?: string;
-  snippet?: string;
+  source?: string;
 }
 
 export interface AIResponse {
   reply: string;
-  cards: Book[];
-  source?: Source[]; // добавляем поддержку источников
+  book_search: Book[];
+  vector_search: Book[];
 }
 
 export async function fetchAIResponse(message: string): Promise<AIResponse> {
   const apiUrl = "/api/chat_card";
-
   const payload = {
     query: message,
     k: 100,
-    sessionId: "web-client", // можно заменить на реальный sessionId
+    sessionId: "web-client",
   };
 
   try {
     const response = await fetch(apiUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
-      throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
-    }
+    if (!response.ok) throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
 
     const data = await response.json();
 
-    // ожидаем, что API возвращает JSON формата { reply, cards, source }
     return {
       reply: data.reply || "Ответ не найден.",
-      cards: data.cards || [],
-      source: data.source || [], // извлекаем source, если он есть
+      book_search: data.book_search || [],
+      vector_search: data.vector_search || [],
     };
   } catch (error) {
     console.error("Ошибка при обращении к AI API:", error);
     return {
       reply: "Произошла ошибка при получении ответа от сервера.",
-      cards: [],
-      source: [],
+      book_search: [],
+      vector_search: [],
     };
   }
 }
