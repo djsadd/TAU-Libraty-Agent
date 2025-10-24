@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 import re
+import asyncio
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_core.tools import tool
@@ -223,6 +224,26 @@ async def chat(req: ChatRequest,
 
     return {"reply": final_answer}
 
+
+
+async def summarize_card(llm, req, card):
+    system_role = (
+        "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
+        "почему этот источник может быть полезен студенту по данному вопросу."
+    )
+    human_msg = (
+        f"Вопрос: {req.query}\n\n"
+        f"Источник: {card['title']}\n\n"
+        f"Фрагмент: {card['text_snippet']}"
+    )
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_role),
+        ("human", human_msg)
+    ])
+    response = await llm.ainvoke(prompt.format_messages())  # <-- async вызов
+    return {**card, "summary": response.content}
+
+
 @router.post("/chat_card", summary="Чат с карточками книг")
 async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
@@ -283,23 +304,25 @@ async def chat(req: ChatRequest,
         })
 
     # --- АННОТАЦИИ для vector_search ---
-    annotated_vector_cards = []
-    for card in vector_cards:
-        system_role = (
-            "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
-            "почему этот источник может быть полезен студенту по данному вопросу."
-        )
-        human_msg = (
-            f"Вопрос: {req.query}\n\n"
-            f"Источник: {card['title']}\n\n"
-            f"Фрагмент: {card['text_snippet']}"
-        )
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_role),
-            ("human", human_msg)
-        ])
-        summary = llm.invoke(prompt.format_messages()).content
-        annotated_vector_cards.append({**card, "summary": summary})
+    tasks = [summarize_card(llm, req, card) for card in vector_cards]
+    annotated_vector_cards = await asyncio.gather(*tasks)
+    # annotated_vector_cards = []
+    # for card in vector_cards:
+    #     system_role = (
+    #         "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
+    #         "почему этот источник может быть полезен студенту по данному вопросу."
+    #     )
+    #     human_msg = (
+    #         f"Вопрос: {req.query}\n\n"
+    #         f"Источник: {card['title']}\n\n"
+    #         f"Фрагмент: {card['text_snippet']}"
+    #     )
+    #     prompt = ChatPromptTemplate.from_messages([
+    #         ("system", system_role),
+    #         ("human", human_msg)
+    #     ])
+    #     summary = llm.invoke(prompt.format_messages()).content
+    #     annotated_vector_cards.append({**card, "summary": summary})
 
     # --- Генерация основного ответа ---
     context = "\n\n".join([
