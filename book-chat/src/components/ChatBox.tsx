@@ -1,4 +1,3 @@
-// src/components/ChatBox.tsx
 import React, { useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
@@ -10,7 +9,8 @@ interface Message {
   role: "user" | "assistant";
   text?: string;
   reply?: string;
-  cards?: Book[];
+  vector_search?: Book[];
+  book_search?: Book[];
 }
 
 export const ChatBox: React.FC = () => {
@@ -34,7 +34,8 @@ export const ChatBox: React.FC = () => {
       const aiMsg: Message = {
         role: "assistant",
         reply: res.reply,
-        cards: res.cards,
+        vector_search: res.vector_search,
+        book_search: res.book_search,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
@@ -80,15 +81,39 @@ export const ChatBox: React.FC = () => {
                 />
               )}
 
-              {msg.cards && msg.cards.length > 0 && (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
-                  {msg.cards.map((book, j) => (
-                    <BookCard
-                      key={j}
-                      book={book}
-                      onClick={() => setSelectedBook(book)}
-                    />
-                  ))}
+              {/* Карточки из vector_search */}
+              {msg.vector_search && msg.vector_search.length > 0 && (
+                <div className="mt-3">
+                  <h4 className="text-xs text-gray-500 mb-1">
+                    Релевантные книги (векторный поиск)
+                  </h4>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {msg.vector_search.map((book, j) => (
+                      <BookCard
+                        key={j}
+                        book={book}
+                        onClick={() => setSelectedBook(book)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Карточки из book_search */}
+              {msg.book_search && msg.book_search.length > 0 && (
+                <div className="mt-3">
+                  <h4 className="text-xs text-gray-500 mb-1">
+                    Найдено в базе книг
+                  </h4>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {msg.book_search.map((book, j) => (
+                      <BookCard
+                        key={j}
+                        book={book}
+                        onClick={() => setSelectedBook(book)}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -123,11 +148,10 @@ export const ChatBox: React.FC = () => {
 
       {selectedBook && (
         <BookModal
-  book={selectedBook}
-  aiComment={messages[messages.length - 1]?.reply} // последний ответ LLM
-  onClose={() => setSelectedBook(null)}
-/>
-
+          book={selectedBook}
+          aiComment={messages[messages.length - 1]?.reply}
+          onClose={() => setSelectedBook(null)}
+        />
       )}
     </div>
   );
