@@ -1,23 +1,22 @@
 export interface Book {
   title: string;
-  author: string;
+  author?: string;
   pub_info?: string;
   year?: string;
-  subjects?: string;
-  lang?: string;
-  page?: string | null;
-  id_book: string;
+  id_book?: string;
   text_snippet?: string;
   summary?: string;
   cover?: string;
-  source?: string;
+  source?: string; // добавляем источник: "book_search" или "vector_search"
 }
 
 export interface AIResponse {
-  reply: string;
-  book_search: Book[];
-  vector_search: Book[];
+  reply: string; // текст от LLM
+  vector_search?: Book[]; // результаты из векторного поиска
+  book_search?: Book[]; // результаты из базы книг
+  cards?: Book[]; // поддержка старого поля (чтобы не падало)
 }
+
 
 export async function fetchAIResponse(message: string): Promise<AIResponse> {
   const apiUrl = "/api/chat_card";
