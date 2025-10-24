@@ -278,17 +278,17 @@ async def chat(req: ChatRequest,
             for k in kabis_records
         ]
 
-    book_cards = []
-    for d in book_docs:
-        m = d.metadata or {}
-        book_cards.append({
-            "source": "book_search",
-            "title": m.get("title", "Неизвестная книга"),
-            "author": m.get("author", ""),
-            "page": m.get("page"),
-            "id_book": m.get("id_book"),
-            "text_snippet": (d.page_content or "")[:500].strip()
-        })
+    # book_cards = []
+    # for d in book_docs:
+    #     m = d.metadata or {}
+    #     book_cards.append({
+    #         "source": "book_search",
+    #         "title": m.get("title", "Неизвестная книга"),
+    #         "author": m.get("author", ""),
+    #         "page": m.get("page"),
+    #         "id_book": m.get("id_book"),
+    #         "text_snippet": (d.page_content or "")[:500].strip()
+    #     })
 
     # --- VECTOR SEARCH ---
     vec_docs = retriever.invoke(req.query, config={"k": req.k or 5})
@@ -304,8 +304,15 @@ async def chat(req: ChatRequest,
         })
 
     # --- АННОТАЦИИ для vector_search ---
-    tasks = [summarize_card(llm, req, card) for card in vector_cards]
+    semaphore = asyncio.Semaphore(3)
+
+    async def summarize_card_limited(llm, req, card):
+        async with semaphore:
+            return await summarize_card(llm, req, card)
+
+    tasks = [summarize_card_limited(llm, req, card) for card in vector_cards]
     annotated_vector_cards = await asyncio.gather(*tasks)
+
     # annotated_vector_cards = []
     # for card in vector_cards:
     #     system_role = (
@@ -347,6 +354,6 @@ async def chat(req: ChatRequest,
     # --- Возвращаем результат отдельно ---
     return {
         "reply": "В библиотеке найдены следующие книги: ",
-        "book_search": book_cards,
+        "book_search": kb_map,
         "vector_search": annotated_vector_cards
     }
