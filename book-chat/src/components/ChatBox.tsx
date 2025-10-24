@@ -112,12 +112,13 @@ export const ChatBox: React.FC = () => {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [isTyping, setIsTyping] = useState(false);
 
-  // Состояния для "Загрузить ещё"
-  const [visibleBookCount, setVisibleBookCount] = useState(9);
-  const [visibleVectorCount, setVisibleVectorCount] = useState(9);
+// --- Показ первых 6 карточек, потом по 6 добавляем ---
+const [visibleBookCount, setVisibleBookCount] = useState(6);
+const [visibleVectorCount, setVisibleVectorCount] = useState(6);
 
-  const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
-  const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
+const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
+const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
+
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
