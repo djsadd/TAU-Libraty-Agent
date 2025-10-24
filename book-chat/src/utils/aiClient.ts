@@ -1,3 +1,5 @@
+// src/utils/aiClient.ts
+
 export interface BookCard {
   source: "book_search";
   title: string;
@@ -25,10 +27,9 @@ export type Card = BookCard | VectorCard;
 
 export interface AIResponse {
   reply: string;
-  book_cards?: BookCard[];
-  vector_cards?: VectorCard[];
+  book_search: BookCard[];
+  vector_search: VectorCard[];
 }
-
 
 export async function fetchAIResponse(message: string): Promise<AIResponse> {
   const apiUrl = "/api/chat_card";
@@ -45,7 +46,8 @@ export async function fetchAIResponse(message: string): Promise<AIResponse> {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
 
     const data = await response.json();
 
