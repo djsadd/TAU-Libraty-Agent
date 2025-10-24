@@ -1,8 +1,20 @@
 import React, { useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
-import { BookCard } from "./BookCard";
-import { BookModal } from "./BookModal";
+
+interface Book {
+  title: string;
+  author?: string;
+  pub_info?: string;
+  year?: string;
+  subjects?: string;
+  lang?: string;
+  id_book?: string;
+  text_snippet?: string;
+  summary?: string;
+  cover?: string;
+  page?: string | null;
+}
 
 interface Message {
   role: "user" | "assistant";
@@ -11,6 +23,88 @@ interface Message {
   vector_search?: Book[];
   book_search?: Book[];
 }
+
+// --- Карточка книги из базы ---
+const BookCard: React.FC<{ book: Book; onClick: () => void }> = ({
+  book,
+  onClick,
+}) => (
+  <div
+    onClick={onClick}
+    className="border rounded-xl p-2 cursor-pointer bg-white hover:bg-blue-50 transition"
+  >
+    <div className="text-sm font-semibold truncate">{book.title}</div>
+    {book.author && (
+      <div className="text-xs text-gray-500 truncate">{book.author}</div>
+    )}
+    {book.year && <div className="text-xs text-gray-400">{book.year}</div>}
+    {book.subjects && (
+      <div className="text-xs text-gray-400 truncate">{book.subjects}</div>
+    )}
+  </div>
+);
+
+// --- Карточка из векторного поиска ---
+const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({
+  book,
+  onClick,
+}) => (
+  <div
+    onClick={onClick}
+    className="border rounded-xl p-2 cursor-pointer bg-gray-50 hover:bg-blue-50 transition"
+  >
+    <div className="text-sm font-semibold truncate">{book.title}</div>
+    {book.page && (
+      <div className="text-xs text-gray-500">Стр. {book.page}</div>
+    )}
+    {book.text_snippet && (
+      <div className="text-xs text-gray-400 line-clamp-2">
+        {book.text_snippet}
+      </div>
+    )}
+  </div>
+);
+
+// --- Модалка книги ---
+const BookModal: React.FC<{
+  book: Book;
+  aiComment?: string;
+  onClose: () => void;
+}> = ({ book, aiComment, onClose }) => (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative">
+      <button
+        onClick={onClose}
+        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+      >
+        ✕
+      </button>
+
+      <h2 className="text-xl font-semibold mb-2">{book.title}</h2>
+      {book.author && <p className="text-sm text-gray-600">{book.author}</p>}
+      {book.year && <p className="text-sm text-gray-600">{book.year}</p>}
+      {book.subjects && (
+        <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>
+      )}
+      {book.text_snippet && (
+        <p className="text-sm text-gray-800 mt-3">{book.text_snippet}</p>
+      )}
+      {book.summary && (
+        <p className="text-sm text-gray-700 mt-2">{book.summary}</p>
+      )}
+
+      {aiComment && (
+        <div className="mt-4 p-3 bg-gray-50 border rounded-lg text-sm text-gray-700">
+          <div
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(aiComment.replace(/\n/g, "<br>")),
+            }}
+          />
+        </div>
+      )}
+    </div>
+  </div>
+);
 
 export const ChatBox: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -80,7 +174,7 @@ export const ChatBox: React.FC = () => {
                 />
               )}
 
-              {/* Карточки из vector_search */}
+              {/* Векторные карточки */}
               {msg.vector_search && msg.vector_search.length > 0 && (
                 <div className="mt-3">
                   <h4 className="text-xs text-gray-500 mb-1">
@@ -88,7 +182,7 @@ export const ChatBox: React.FC = () => {
                   </h4>
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {msg.vector_search.map((book, j) => (
-                      <BookCard
+                      <VectorCard
                         key={j}
                         book={book}
                         onClick={() => setSelectedBook(book)}
@@ -98,7 +192,7 @@ export const ChatBox: React.FC = () => {
                 </div>
               )}
 
-              {/* Карточки из book_search */}
+              {/* Базовые карточки */}
               {msg.book_search && msg.book_search.length > 0 && (
                 <div className="mt-3">
                   <h4 className="text-xs text-gray-500 mb-1">
@@ -129,7 +223,10 @@ export const ChatBox: React.FC = () => {
         </div>
 
         {/* Поле ввода */}
-        <form onSubmit={sendMessage} className="border-t p-3 flex gap-2 bg-gray-50">
+        <form
+          onSubmit={sendMessage}
+          className="border-t p-3 flex gap-2 bg-gray-50"
+        >
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
