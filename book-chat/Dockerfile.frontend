@@ -5,7 +5,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN npm install typescript -g
+RUN npm install -g typescript --insecure
+
 
 RUN npm run build
 # === Production сервер (Nginx) ===
