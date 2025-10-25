@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
 
+// --- Константа с логотипом (замени путь при необходимости) ---
+const LOGO_URL = "/src/images/logorgb.png";
+
 // --- Типы ---
 interface Book {
   title: string;
@@ -75,6 +78,7 @@ const BookModal: React.FC<{
       <button
         onClick={onClose}
         className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+        aria-label="Закрыть"
       >
         ✕
       </button>
@@ -105,6 +109,56 @@ const BookModal: React.FC<{
   </div>
 );
 
+// --- Шапка с логотипом ---
+const HeaderBar: React.FC = () => (
+  <div className="w-full border-b bg-white">
+    <div className="mx-auto max-w-2xl flex items-center gap-3 px-4 py-3">
+      <img
+        src={LOGO_URL}
+        alt="TAU Library"
+        className="h-8 w-8 rounded-lg object-contain"
+      />
+      <div className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold text-gray-900">
+          TAU — Library Assistant
+        </span>
+        <span className="text-xs text-gray-500">
+          Поиск по библиотеке и умные рекомендации
+        </span>
+      </div>
+    </div>
+  </div>
+);
+
+// --- Приветственный блок (до начала чата) ---
+const IntroCard: React.FC = () => (
+  <div className="px-4 pt-4">
+    <div className="mx-auto max-w-2xl bg-gradient-to-b from-blue-50 to-white border border-blue-100 rounded-2xl shadow-sm p-5">
+      <div className="flex items-start gap-3">
+        <img
+          src={LOGO_URL}
+          alt="TAU Library"
+          className="h-10 w-10 rounded-xl object-contain"
+        />
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">
+            Найдите нужную книгу или узнайте о библиотеке
+          </h1>
+          <ul className="mt-2 text-sm text-gray-700 space-y-1">
+            <li>• Поиск книг по названию, автору или теме</li>
+            <li>• Информация о библиотеке и её ресурсах</li>
+            <li>• Рекомендации на основе ваших интересов</li>
+          </ul>
+          <p className="mt-3 text-xs text-gray-500">
+            Подсказка: попробуйте запрос «сетевые технологии Таненбаум» или
+            «книги по управлению проектами».
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 // --- Основной компонент чата ---
 export const ChatBox: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -112,13 +166,12 @@ export const ChatBox: React.FC = () => {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [isTyping, setIsTyping] = useState(false);
 
-// --- Показ первых 6 карточек, потом по 6 добавляем ---
-const [visibleBookCount, setVisibleBookCount] = useState(6);
-const [visibleVectorCount, setVisibleVectorCount] = useState(6);
+  // --- Показ первых 6 карточек, потом по 6 добавляем ---
+  const [visibleBookCount, setVisibleBookCount] = useState(6);
+  const [visibleVectorCount, setVisibleVectorCount] = useState(6);
 
-const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
-const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
-
+  const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
+  const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -152,7 +205,13 @@ const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
 
   return (
     <div className="flex flex-col items-center w-full h-screen bg-gray-50">
-      <div className="w-full max-w-2xl flex flex-col h-full border-x bg-white shadow-sm">
+      {/* Шапка с логотипом */}
+      <HeaderBar />
+
+      {/* Приветственный блок показываем, пока нет сообщений */}
+      {messages.length === 0 && <IntroCard />}
+
+      <div className="w-full max-w-2xl flex flex-col h-[calc(100vh-120px)] border-x bg-white shadow-sm mt-3">
         {/* История чата */}
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
           {messages.map((msg, i) => (
