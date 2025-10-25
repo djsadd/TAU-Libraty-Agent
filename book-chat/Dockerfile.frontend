@@ -1,14 +1,26 @@
-# === Сборка React (Vite) ===
+# === Сборка React (Vite + TypeScript) ===
 FROM node:20 AS build
 WORKDIR /app
 
+# Копируем package.json и package-lock.json для установки зависимостей
 COPY package*.json ./
-RUN npm install --include=dev
+
+# Устанавливаем все зависимости, включая dev (чтобы был tsc)
+RUN npm ci || npm install --include=dev
+
+# Проверим, что TypeScript точно установлен (опционально, для отладки)
+RUN npx tsc --version || npm install --save-dev typescript
+
+# Копируем всё остальное
 COPY . .
 
+# Собираем проект
 RUN npm run build
+
 # === Production сервер (Nginx) ===
 FROM nginx:1.25-alpine
+
+# Копируем собранный фронтенд из предыдущего этапа
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
