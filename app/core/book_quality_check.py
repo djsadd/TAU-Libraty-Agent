@@ -1,30 +1,25 @@
-import os, math, random, io
+import os
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional
 import re
 
 import charset_normalizer as chn
 from langdetect import detect, DetectorFactory
-DetectorFactory.seed = 0  # стабильность langdetect
 from ftfy import fix_text
-from collections import Counter
 
-# PDF
-import fitz  # PyMuPDF
-# OCR
+import fitz
 import pytesseract
-from pytesseract import Output
-from PIL import Image
 
-# Опционально для DOCX/EPUB
 from docx import Document as DocxDocument
 from ebooklib import epub
 from app.core.config import settings
 
-pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
 
 import math
 from collections import Counter
+
+DetectorFactory.seed = 0
+pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
 
 
 def is_scanned_pdf(path: str, min_text_per_page: int = 300, min_text_fraction: float = 0.3) -> bool:
@@ -32,7 +27,7 @@ def is_scanned_pdf(path: str, min_text_per_page: int = 300, min_text_fraction: f
     try:
         doc = fitz.open(path)
     except Exception:
-        return True  # битый PDF считаем как скан/нечитабельный
+        return True
 
     n_pages = doc.page_count
     if n_pages == 0:
@@ -42,7 +37,7 @@ def is_scanned_pdf(path: str, min_text_per_page: int = 300, min_text_fraction: f
     total_chars = 0
     image_pages = 0
 
-    for i in range(min(n_pages, 10)):  # проверяем только первые 10 страниц для скорости
+    for i in range(min(n_pages, 10)):
         page = doc.load_page(i)
         text = page.get_text("text")
         total_chars += len(text)
@@ -54,9 +49,6 @@ def is_scanned_pdf(path: str, min_text_per_page: int = 300, min_text_fraction: f
     avg_chars = total_chars / max(1, min(n_pages, 10))
     text_fraction = pages_with_text / max(1, min(n_pages, 10))
 
-    # 🎯 Эвристика
-    # - почти нет текста
-    # - при этом есть изображения
     if text_fraction < min_text_fraction and image_pages > pages_with_text:
         return True
 
@@ -100,7 +92,6 @@ def dominant_word_ratio(text: str) -> float:
     return total / len(words)
 
 
-# ---------- Метрики текста ----------
 def basic_text_metrics(text: str) -> dict:
     if not text:
         return {
@@ -148,7 +139,6 @@ def text_is_readable(metrics: dict, text: str) -> bool:
     )
 
 
-# ---------- TXT/DOCX/EPUB ----------
 def read_txt(path: str) -> str:
     raw = open(path, "rb").read()
     best = chn.from_bytes(raw).best()
@@ -175,12 +165,10 @@ def read_epub(path: str) -> str:
                 buf.append(item.get_body_content().decode("utf-8", errors="ignore"))
             except Exception:
                 pass
-    # очень грубо: убрать теги
     text = re.sub(r"<[^>]+>", " ", " ".join(buf))
     return fix_text(text)
 
 
-# ---------- PDF ----------
 @dataclass
 class PDFTextStats:
     n_pages: int
@@ -204,7 +192,6 @@ def pdf_extract_text_stats(path: str) -> PDFTextStats:
         total_chars += len(txt)
         if len(txt.strip()) >= 50:
             pages_with_text += 1
-        # добавим текст для анализа только с первых 5 страниц
         if i < 5:
             sample_text.append(txt)
 
@@ -213,13 +200,11 @@ def pdf_extract_text_stats(path: str) -> PDFTextStats:
     entropy = text_entropy(text_sample)
     line_div = line_diversity_score(text_sample)
 
-    # Вердикт без OCR
     if pages_with_text / max(1, n) >= 0.7 and total_chars >= 2000:
         verdict = "OK_TEXT_PDF"
     else:
         verdict = "SCANNED_OR_LOW_TEXT"
 
-    # Проверка на мусор
     if total_chars / max(1, n) > 100_000 or rep_score > 0.8 or entropy < 2.0 or line_div < 0.3:
         verdict = "CORRUPTED_TEXT_LAYER"
 
@@ -237,7 +222,6 @@ def check_file(path: str) -> dict:
     ext = os.path.splitext(path)[1].lower()
     report = {"path": path, "ext": ext, "book_quality": "UNKNOWN"}
 
-    # 1️⃣ Проверка, что файл существует и не пустой
     if not os.path.exists(path):
         report.update({"verdict": "MISSING_FILE", "book_quality": "REJECT"})
         return report
@@ -292,7 +276,6 @@ def check_file(path: str) -> dict:
         })
         return report
 
-    # 3️⃣ Текстовые форматы
     text = ""
     try:
         if ext == ".txt":
@@ -317,7 +300,6 @@ def check_file(path: str) -> dict:
         })
         return report
 
-    # 4️⃣ Проверка читаемости и качества текста
     text = fix_text(text)
     metrics = basic_text_metrics(text)
     entropy = text_entropy(text)

@@ -33,7 +33,6 @@ def is_text_based_pdf(path: str) -> bool:
                 return True
         return False
     except Exception:
-        # если PDF битый или PyPDF2 не смог распарсить — считаем сканом
         return False
 
 
@@ -46,7 +45,7 @@ def load_docs(path: str, meta: Optional[dict] = None):
             docs = PyPDFLoader(str(p)).load()
         else:
             return False
-            docs = UnstructuredPDFLoader(str(p), strategy="hi_res", ocr_strategy="none").load()
+            # docs = UnstructuredPDFLoader(str(p), strategy="hi_res", ocr_strategy="none").load()
 
     elif suffix in {".txt", ".md"}:
         docs = TextLoader(str(p), encoding="utf-8").load()
@@ -62,15 +61,15 @@ def load_docs(path: str, meta: Optional[dict] = None):
         docs = UnstructuredEPubLoader(str(p)).load()
         for i, d in enumerate(docs, 1):
             d.metadata.setdefault("page", i)
-
     else:
         raise ValueError(f"Неизвестный формат: {suffix}")
 
-    # общие метаданные
     for d in docs:
         d.metadata.setdefault("source", str(p))
-        if meta and "title" in meta and meta["title"]:
-            d.metadata.setdefault("title", meta["title"])
+        if meta and "title_book" in meta and meta["title_book"]:
+            d.metadata.setdefault("title_book", meta["title_book"])
+            d.metadata.setdefault("id_book", meta["id_book"])
+            d.metadata.setdefault("doc_id", meta["doc_id"])
         else:
             d.metadata.setdefault("title", p.stem)
 

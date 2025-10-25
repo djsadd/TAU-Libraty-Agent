@@ -80,7 +80,6 @@ def process_file(job_id: str, filename: str, meta: dict | None = None):
         # === extract ===
         update_job(db, job_id, current_step="extract", progress_pct=10)
 
-        print(save_path)
         docs = load_docs(save_path, meta) if meta else load_docs(save_path)
         if not docs:
             raise Exception("Документы не были загружены")
@@ -91,7 +90,6 @@ def process_file(job_id: str, filename: str, meta: dict | None = None):
 
         # === embed ===
         update_job(db, job_id, current_step="embed", progress_pct=70)
-        # ... эмбеддинги ...
 
         # === index ===
         update_job(db, job_id, current_step="index", progress_pct=90)
@@ -140,7 +138,6 @@ def process_file_library(job_id: str, filename: str, meta: dict | None = None):
 
         # === embed ===
         update_job(db, job_id, current_step="embed", progress_pct=70)
-        # ... эмбеддинги ...
 
         # === index ===
         update_job(db, job_id, current_step="index", progress_pct=90)
@@ -166,7 +163,7 @@ def process_file_library(job_id: str, filename: str, meta: dict | None = None):
         db.close()
 
 
-@dramatiq.actor(max_retries=5, min_backoff=30000, queue_name="ingest")  # 30s, 2m, 10m...
+@dramatiq.actor(max_retries=5, min_backoff=30000, queue_name="ingest")
 def ingest_job(job_id: str, filename: str | None = None, meta: dict | None = None):
     if not filename:
         process_title_only(job_id, meta)

@@ -1,23 +1,29 @@
 from fastapi import APIRouter
+from fastapi import BackgroundTasks
 from sqlalchemy import select
-from app.models.kabis import Kabis
 
 from app.core.book_quality_check import check_file
 from app.core.db import SessionLocal
+from app.models.kabis import Kabis
+
 from app.models.job import Job, JobStatus
+
 from app.models.books import Document
-from ...worker import ingest_job
+from app.worker import ingest_job
+
 import uuid
 import os
 import requests
 from pathlib import Path
 
 
-router = APIRouter(prefix="/api", tags=["upload_kabis", "index_kabis_books", "index_kabis_file_books"])
+router = APIRouter(prefix="/api", tags=["index_kabis_books", "index_kabis_file_books"])
 
 
-@router.get("/index_kabis", summary="Индексирование библиотеки КАБИС",
-             description="Индексирование библиотеки кабис")
+@router.get("/index_kabis",
+            summary="Index titles from library information resources",
+            description="Index titles from library information resources"
+            )
 async def kabis_index():
     with SessionLocal() as session:
         stmt = select(Kabis).where(Kabis.is_indexed==False)
@@ -28,24 +34,28 @@ async def kabis_index():
 
             db = SessionLocal()
 
-            # 3) создать Job в БД
             job = Job(document_id=document_id, status=JobStatus.queued)
             db.add(job)
             db.commit()
             db.refresh(job)
             db.close()
 
-            # 4) поставить в очередь
             ingest_job.send(job.id, meta=row_dict)
             db.commit()
-    return {"Hello": "World"}
+    return {"message": f"Index is stated", "queued_jobs": len(rows)}
 
 
-@router.get("/index_kabis_file_books", summary="Индексирование библиотеки КАБИС",
-             description="Индексирование библиотеки кабис")
-async def index_kabis_file_books():
-    path_url = "https://kabis.tau-edu.kz"   # лучше явно https://
-    save_dir = Path("uploads")            # папка куда сохраняем файлы
+@router.get("/index_kabis_file_books",
+            summary="Индексирование KABIS",
+            description="Запускает процесс индексирования файлов KABIS в фоне")
+async def index_kabis_file_books(background_tasks: BackgroundTasks):
+    background_tasks.add_task(process_kabis_files)
+    return {"status": "started", "message": "Индексирование запущено в фоне"}
+
+
+def process_kabis_files():
+    path_url = 'https://kabis.tau-edu.kz'
+    save_dir = Path('uploads')
     save_dir.mkdir(exist_ok=True)
 
     with SessionLocal() as session:
@@ -66,45 +76,42 @@ async def index_kabis_file_books():
             try:
                 resp = requests.get(url, timeout=30)
                 resp.raise_for_status()
-            except requests.RequestException as e:
-                print(f"⚠️ Ошибка скачивания {url}: {e}, пропускаем...")
+            except requests.RequestException:
                 continue
 
             with open(save_path, "wb") as f:
                 f.write(resp.content)
 
-            print(f"✅ Saved {url} -> {save_path}")
-
-            # проверка читаемости
             book_quality = check_file(save_path)
             if book_quality["verdict"] not in ("OK_TEXT", "OK_TEXT_PDF", "OK_OCR"):
-                print(f"⚠️ Документ {filename} не читаемый, пропускаем...")
                 continue
 
-            document_id = str(uuid.uuid4())
-
-            # создаём документ
             doc = Document(
                 title=row.title or row.author,
                 file_path=str(save_path),
                 file_type=filename.split(".")[-1].lower(),
-                kabis_id=row.id_book,
+                id_book=row.id,
+                source="kabis"
             )
             session.add(doc)
             session.commit()
             session.refresh(doc)
 
-            # создаём Job
-            job = Job(document_id=document_id, status=JobStatus.queued)
+            job = Job(
+                document_id=doc.id,
+                status=JobStatus.queued
+            )
+
             session.add(job)
             session.commit()
             session.refresh(job)
 
-            # ставим в очередь
-            ingest_job(job.id, str(filename), meta={"id_book": row.id_book, "title": row.title or row.author})
+            ingest_job(job.id, str(filename), meta={
+                "id_book": row.id_book,
+                "title_book": row.title or row.author,
+                "doc_id": doc.id,
+                "source_data": "kabis",
+            })
 
-            # вот здесь обновляем поле у row (Kabis)
             row.file_is_index = True
             session.commit()
-
-    return {"Hello": "World"}

@@ -9,7 +9,7 @@ from app.core.db import SessionLocal
 
 from sqlalchemy.orm import Session
 
-router = APIRouter(prefix="/api", tags=["index_kabis_books"])
+router = APIRouter(prefix="/api", tags=["upload_kabis"])
 
 
 def save_kabis_rows(session: Session, rows: list[dict]):
@@ -46,37 +46,71 @@ def save_kabis_rows(session: Session, rows: list[dict]):
 
 # kabis_service.py
 def sync_kabis_upload():
+    """
+    Синхронизация локальной базы Kabis с удалённым источником.
+    Загружает только новые книги, если их количество увеличилось.
+    """
     token = get_token(settings.KABIS_USERNAME, settings.KABIS_PASSWORD)
-    books_count = api_get("/count_books", token).json()["Count book"][1]
+
+    # Получаем общее количество книг с KABIS API
+    kabis_count_resp = api_get("/count_books", token).json()
+    kabis_count = kabis_count_resp.get("Count book", [0, 0])[1]
 
     with SessionLocal() as session:
-        count = session.scalar(select(func.count()).select_from(Kabis))
-        row = count
+        # Считаем количество записей в локальной таблице
+        local_count = session.scalar(select(func.count()).select_from(Kabis)) or 0
 
-        if row and row < books_count:
+        # --- Если локальная и удалённая база совпадают ---
+        if local_count == kabis_count:
+            print(f"[INFO] Данные уже синхронизированы. Локально: {local_count}, KABIS: {kabis_count}")
+            return {
+                "status": "up_to_date",
+                "message": "Данные уже синхронизированы.",
+                "count": kabis_count,
+            }
+
+        # --- Если локальная база пуста (первая загрузка) ---
+        if local_count == 0:
+            print("[INFO] Первая загрузка данных с KABIS...")
             json_kabis = api_get(
                 "/get_books_range",
                 token,
-                params={"start_pos": int(row), "end_pos": int(books_count)}
+                params={"start_pos": 1, "end_pos": kabis_count}
             ).json()
-            rows = parse_payload(json_kabis)
-            rows_flat = flatten_copies(rows)
-            save_kabis_rows(session, rows_flat)
-            return json_kabis
-        elif not row:
+
+        # --- Если появились новые книги ---
+        elif local_count < kabis_count:
+            print(f"[INFO] Обнаружены новые книги: {kabis_count - local_count} шт.")
             json_kabis = api_get(
                 "/get_books_range",
                 token,
-                params={"start_pos": 1, "end_pos": 100}
+                params={"start_pos": int(local_count), "end_pos": int(kabis_count)}
             ).json()
-            rows = parse_payload(json_kabis)
-            rows_flat = flatten_copies(rows)
-            save_kabis_rows(session, rows_flat)
-            return rows_flat
-        return {"Count books": books_count}
+
+        else:
+            # Это на случай, если почему-то локальных книг больше (ошибка данных)
+            print(f"[WARN] Локальных записей больше, чем в KABIS! ({local_count} > {kabis_count})")
+            return {
+                "status": "mismatch",
+                "message": "Локальных записей больше, чем в KABIS.",
+                "local_count": local_count,
+                "kabis_count": kabis_count,
+            }
+
+        # --- Сохраняем новые данные ---
+        rows = parse_payload(json_kabis)
+        rows_flat = flatten_copies(rows)
+        save_kabis_rows(session, rows_flat)
+
+        print(f"[INFO] Успешно добавлено {len(rows_flat)} записей в базу.")
+        return {
+            "status": "success",
+            "added": len(rows_flat),
+            "new_total": kabis_count,
+        }
 
 
-@router.get("/upload_kabis")
+@router.get("/upload_kabis", summary="Получение данных из базы Kabis")
 async def kabis_upload():
     try:
         result = sync_kabis_upload()

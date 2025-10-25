@@ -48,13 +48,14 @@ async def startup_event():
     scheduler.add_job(
         enqueue_task,
         trigger="interval",
-        seconds=3600,  # раз в 30 секунд
+        seconds=360,
         id="kabis_test_upload",
         replace_existing=True,
     )
 
     scheduler.start()
     logger.info("✅ APScheduler запущен, задача на 02:00 зарегистрирована")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
