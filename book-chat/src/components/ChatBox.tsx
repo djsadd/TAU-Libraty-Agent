@@ -88,18 +88,13 @@ const BookModal: React.FC<{
       {book.subjects && (
         <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>
       )}
-      {book.text_snippet && (
-        <p className="text-sm text-gray-800 mt-3">{book.text_snippet}</p>
-      )}
-      {book.summary && (
-        <p className="text-sm text-gray-700 mt-2">{book.summary}</p>
-      )}
 
-      {aiComment && book.text_snippet && (
+
+      {aiComment && book.summary && (
           <div className="mt-4 p-3 bg-gray-50 border rounded-lg text-sm text-gray-700">
             <div
               dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(book.text_snippet.replace(/\n/g, "<br>")),
+                __html: DOMPurify.sanitize(book.summary.replace(/\n/g, "<br>")),
               }}
             />
           </div>
