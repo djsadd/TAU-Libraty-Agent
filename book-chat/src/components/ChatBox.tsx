@@ -95,15 +95,16 @@ const BookModal: React.FC<{
         <p className="text-sm text-gray-700 mt-2">{book.summary}</p>
       )}
 
-      {aiComment && (
-        <div className="mt-4 p-3 bg-gray-50 border rounded-lg text-sm text-gray-700">
-          <div
-            dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(aiComment.replace(/\n/g, "<br>")),
-            }}
-          />
-        </div>
-      )}
+      {aiComment && book.text_snippet && (
+          <div className="mt-4 p-3 bg-gray-50 border rounded-lg text-sm text-gray-700">
+            <div
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(book.text_snippet.replace(/\n/g, "<br>")),
+              }}
+            />
+          </div>
+        )}
+
     </div>
   </div>
 );
