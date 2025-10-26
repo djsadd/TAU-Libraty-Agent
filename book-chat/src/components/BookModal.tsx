@@ -47,13 +47,13 @@ export const BookModal: React.FC<BookModalProps> = ({ book, onClose }) => (
 
       {book.summary && (
         <div className="text-gray-800 text-sm mb-4 leading-relaxed">
-          {book.summary}
+          {book.text_snippet}
         </div>
       )}
 
       {book.text_snippet && (
         <blockquote className="italic text-gray-600 border-l-4 border-blue-400 pl-3 mb-4">
-          {book.text_snippet} text
+          {book.text_snippet}
         </blockquote>
       )}
 
