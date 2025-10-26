@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
 
-const LOGO_URL = "/src/images/logorgb.png";
+const LOGO_URL = "/images/logorgb.png";
 
 // --- Типы ---
 interface Book {
