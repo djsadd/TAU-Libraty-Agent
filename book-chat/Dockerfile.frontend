@@ -20,7 +20,14 @@ RUN npm run build
 
 # === Production сервер (Nginx) ===
 FROM nginx:1.25-alpine
+
+# Копируем собранный проект
 COPY --from=build /app/dist /usr/share/nginx/html
+
+# 🔹 ДОБАВЛЯЕМ КАРТИНКИ ИЗ src/images
+COPY --from=build /app/src/images /usr/share/nginx/html/images
+
+# Копируем конфиг Nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
