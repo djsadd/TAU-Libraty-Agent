@@ -42,13 +42,18 @@ export const MessageBubble: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
+    <div className="flex flex-col items-center justify-center h-screen bg-gray-100 overflow-hidden">
       {/* Область сообщений с прокруткой */}
-      <div className="flex flex-col h-[70vh] w-full max-w-[500px] overflow-y-auto p-4 bg-white rounded-lg shadow-inner">
-        {messages.map((msg, idx) => (
-          <Bubble key={idx} role={msg.role} text={msg.text} />
-        ))}
-        <div ref={messagesEndRef} />
+      <div className="flex flex-col h-[70vh] w-full max-w-[500px] overflow-hidden bg-white rounded-lg shadow-inner min-h-0">
+        <div
+          className="flex-1 overflow-y-auto p-4 min-h-0"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          {messages.map((msg, idx) => (
+            <Bubble key={idx} role={msg.role} text={msg.text} />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Кнопка добавления сообщений */}

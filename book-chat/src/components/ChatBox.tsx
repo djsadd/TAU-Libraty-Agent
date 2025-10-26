@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
 
@@ -89,17 +89,15 @@ const BookModal: React.FC<{
         <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>
       )}
 
-
       {aiComment && book.summary && (
-          <div className="mt-4 p-3 bg-gray-50 border rounded-lg text-sm text-gray-700">
-            <div
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(book.summary.replace(/\n/g, "<br>")),
-              }}
-            />
-          </div>
-        )}
-
+        <div className="mt-4 p-3 bg-gray-50 border rounded-lg text-sm text-gray-700">
+          <div
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(book.summary.replace(/\n/g, "<br>")),
+            }}
+          />
+        </div>
+      )}
     </div>
   </div>
 );
@@ -164,6 +162,9 @@ export const ChatBox: React.FC = () => {
   const [visibleBookCount, setVisibleBookCount] = useState(6);
   const [visibleVectorCount, setVisibleVectorCount] = useState(6);
 
+  // --- ключ: ссылочный элемент для автоскролла
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
   const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
   const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
 
@@ -194,18 +195,25 @@ export const ChatBox: React.FC = () => {
     }
   }
 
+  // --- автоскролл при изменении сообщений и статуса набора
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isTyping]);
+
   return (
     <div className="flex flex-col w-full h-screen bg-gray-50 overflow-hidden">
       <HeaderBar />
 
       {/* Основной блок под хедером */}
-      <div className="flex flex-col flex-1 items-center pt-[72px] overflow-hidden">
+      <div className="flex flex-col flex-1 items-center pt-[72px] overflow-hidden min-h-0">
         {messages.length === 0 && <IntroCard />}
 
-        <div className="w-full max-w-2xl flex flex-col flex-1 border-x bg-white shadow-sm">
+        <div className="w-full max-w-2xl flex flex-col flex-1 border-x bg-white shadow-sm min-h-0">
           {/* История чата */}
-    <div className="flex-1 overflow-y-auto p-3 space-y-4 mb-[56px]">
-
+          <div
+            className="flex-1 overflow-y-auto min-h-0 p-3 space-y-4 mb-[56px]"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -308,6 +316,9 @@ export const ChatBox: React.FC = () => {
                 <span>ИИ печатает...</span>
               </div>
             )}
+
+            {/* якорь для скролла */}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Поле ввода */}
@@ -320,6 +331,7 @@ export const ChatBox: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Введите запрос к ИИ..."
               className="flex-1 border rounded-xl px-3 py-2 focus:outline-none"
+              aria-label="Сообщение"
             />
             <button
               type="submit"
