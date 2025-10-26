@@ -16,7 +16,7 @@ export const VectorCard: React.FC<VectorCardProps> = ({ book, onClick }) => (
 
       {book.text_snippet && (
         <p className="text-gray-700 text-xs mt-1 line-clamp-3">
-          {book.text_snippet}
+          {book.summary}
         </p>
       )}
 
