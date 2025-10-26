@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* === Глобальные базовые стили === */
+@layer base {
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;       /* отключаем скролл страницы */
+  }
+  body {
+    overscroll-behavior: contain; /* мягче на мобилках */
+  }
+}

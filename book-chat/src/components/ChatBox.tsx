@@ -201,7 +201,7 @@ export const ChatBox: React.FC = () => {
   }, [messages, isTyping]);
 
   return (
-    <div className="flex flex-col w-full h-screen bg-gray-50 overflow-hidden">
+    <div className="fixed inset-0 flex flex-col w-full bg-gray-50 overflow-hidden">
       <HeaderBar />
 
       {/* Основной блок под хедером */}
