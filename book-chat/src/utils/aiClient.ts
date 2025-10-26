@@ -20,6 +20,7 @@ export interface VectorCard {
   id_book?: string;
   page?: string | null;
   text_snippet?: string;
+  download_url: string;
   summary?: string;
 }
 

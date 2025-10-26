@@ -8,6 +8,7 @@ from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_core.tools import tool
 from sqlalchemy.orm import Session
 from app.models.kabis import Kabis
+from app.models.libtau import Library
 import time
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/api", tags=["chat", "chat_card"])
 from app.core.db import SessionLocal
 import re
 
+from app.models.books import Document
 
 def clean_context(text: str) -> str:
     """
@@ -226,21 +228,35 @@ async def chat(req: ChatRequest,
 
 
 async def summarize_card(llm, req, card):
+    key, value = card
+    context = ''
+    cards = {
+
+    }
+    for i in range(len(value["pages"])):
+        context += "стр." + str(value["pages"][i]) + "\n"
+        context += "фрагмент" + value["text_snippets"][i] + "\n"
     system_role = (
-        "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
+        "Ты — академический помощник. Кратко объясни, "
         "почему этот источник может быть полезен студенту по данному вопросу."
+        "Ответ давай в формате: стр. X - объяснение. По всем страницам переданные тебе."
     )
     human_msg = (
         f"Вопрос: {req.query}\n\n"
-        f"Источник: {card['title']}\n\n"
-        f"Фрагмент: {card['text_snippet']}"
+        f"Источник: {value['title']}\n\n"
+        f"Фрагмент: {context}"
     )
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_role),
         ("human", human_msg)
     ])
     response = await llm.ainvoke(prompt.format_messages())  # <-- async вызов
-    return {**card, "summary": response.content}
+    return {
+        'title': value["title"],
+        'download_url': value['download_url'],
+        "text_snippet": context,
+        "summary": response.content
+            }
 
 
 @router.post("/chat_card", summary="Чат с карточками книг")
@@ -278,80 +294,73 @@ async def chat(req: ChatRequest,
             for k in kabis_records
         ]
 
-    # book_cards = []
-    # for d in book_docs:
-    #     m = d.metadata or {}
-    #     book_cards.append({
-    #         "source": "book_search",
-    #         "title": m.get("title", "Неизвестная книга"),
-    #         "author": m.get("author", ""),
-    #         "page": m.get("page"),
-    #         "id_book": m.get("id_book"),
-    #         "text_snippet": (d.page_content or "")[:500].strip()
-    #     })
-
     # --- VECTOR SEARCH ---
     vec_docs = retriever.invoke(req.query, config={"k": req.k or 5})
-    vector_cards = []
+
+    vector_cards_dictionary = {}
+
     for d in vec_docs:
         m = d.metadata or {}
-        vector_cards.append({
-            "source": "vector_search",
-            "title": m.get("title", "Неизвестный источник"),
-            "page": m.get("page"),
-            "id_book": m.get("id_book"),
-            "text_snippet": (d.page_content or "")[:600].strip()
-        })
+        id_book = m.get("id_book")
+        if id_book in vector_cards_dictionary:
+            text_snippet = (d.page_content or "")[:600].strip()
+            page = m.get("page")
+            vector_cards_dictionary[id_book]['pages'].append(page)
+            vector_cards_dictionary[id_book]['text_snippets'].append(text_snippet)
+        else:
+            text_snippet = (d.page_content or "")[:600].strip()
+            page = m.get("page")
+            vector_cards_dictionary[id_book] = {
+                "pages": [page],
+                "text_snippets": [text_snippet],
+            }
 
-    # --- АННОТАЦИИ для vector_search ---
+    id_books = [d.metadata.get("doc_id") for d in vec_docs if d.metadata]
+    with SessionLocal() as session:
+        documents = session.query(Document).filter(Document.id.in_(id_books)).all()
+        for doc in documents:
+            print(doc.source, doc.source == "library")
+            if doc.source == 'kabis':
+                record = session.query(Kabis).filter_by(id=doc.id_book).first()
+
+                vector_cards_dictionary[doc.id_book]["title"] = record.title or record.author
+                vector_cards_dictionary[doc.id_book]["language"] = record.lang
+                vector_cards_dictionary[doc.id_book]["pub_info"] = record.pub_info
+                vector_cards_dictionary[doc.id_book]["subjects"] = record.subjects
+                vector_cards_dictionary[doc.id_book]["download_url"] = record.download_url
+            elif doc.source == 'library':
+                record = session.query(Library).filter_by(id=doc.id_book).first()
+
+                vector_cards_dictionary[doc.id_book]["title"] = record.title
+                vector_cards_dictionary[doc.id_book]["download_url"] = record.download_url
+
     semaphore = asyncio.Semaphore(3)
 
     async def summarize_card_limited(llm, req, card):
         async with semaphore:
             return await summarize_card(llm, req, card)
 
-    tasks = [summarize_card_limited(llm, req, card) for card in vector_cards]
+    tasks = [summarize_card_limited(llm, req, card) for card in vector_cards_dictionary.items()]
     annotated_vector_cards = await asyncio.gather(*tasks)
 
-    # annotated_vector_cards = []
-    # for card in vector_cards:
-    #     system_role = (
-    #         "Ты — академический помощник. Кратко (1–2 предложения) объясни, "
-    #         "почему этот источник может быть полезен студенту по данному вопросу."
-    #     )
-    #     human_msg = (
-    #         f"Вопрос: {req.query}\n\n"
-    #         f"Источник: {card['title']}\n\n"
-    #         f"Фрагмент: {card['text_snippet']}"
-    #     )
-    #     prompt = ChatPromptTemplate.from_messages([
-    #         ("system", system_role),
-    #         ("human", human_msg)
-    #     ])
-    #     summary = llm.invoke(prompt.format_messages()).content
-    #     annotated_vector_cards.append({**card, "summary": summary})
+    # context = "\n\n".join([
+    #     f"[{d.metadata.get('title', '')}] {clean_context(d.page_content[:800])}"
+    #     for d in vec_docs
+    # ])
+    # text_prompt = ChatPromptTemplate.from_messages([
+    #     ("system", "Ты — интеллектуальный помощник университета Туран-Астана. Отвечай строго по контексту."),
+    #     ("human", f"Вопрос студента: {req.query}\n\nКонтекст:\n{context}")
+    # ])
+    # final_answer = llm.invoke(text_prompt.format_messages()).content
 
-    # --- Генерация основного ответа ---
-    context = "\n\n".join([
-        f"[{d.metadata.get('title', '')}] {clean_context(d.page_content[:800])}"
-        for d in vec_docs
-    ])
-    text_prompt = ChatPromptTemplate.from_messages([
-        ("system", "Ты — интеллектуальный помощник университета Туран-Астана. Отвечай строго по контексту."),
-        ("human", f"Вопрос студента: {req.query}\n\nКонтекст:\n{context}")
-    ])
-    final_answer = llm.invoke(text_prompt.format_messages()).content
-
-    # --- Сохраняем историю ---
     save_chat_history(
         db=db,
         session_id=session_id,
         question=req.query,
-        answer=final_answer,
+        answer="",
         tools_used=["book_search", "vector_search"]
     )
 
-    # --- Возвращаем результат отдельно ---
     return {
         "reply": "В библиотеке найдены следующие книги: ",
         "book_search": kb_map,
