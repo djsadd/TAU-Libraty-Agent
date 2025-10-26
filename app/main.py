@@ -11,6 +11,8 @@ from .api.routes.jobs import router as jobs_router
 from .api.routes.kabis_integrate import router as kabis_router
 from app.api.routes.libtau_integrate import router as lib_router
 from app.tasks import run_kabis_upload_task  # наш актор
+from app.api.routes import users
+from app.api.routes import auth
 
 # Логгер
 logger = logging.getLogger(__name__)
@@ -28,6 +30,10 @@ app = FastAPI(
 
 # Routers
 setup_cors(app)
+
+app.include_router(auth.router)
+app.include_router(users.router)
+
 app.include_router(upload_router)
 app.include_router(chat_router)
 app.include_router(jobs_router)
