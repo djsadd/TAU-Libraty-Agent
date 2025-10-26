@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
 
-// --- Константа с логотипом (замени путь при необходимости) ---
 const LOGO_URL = "/src/images/logorgb.png";
 
 // --- Типы ---
@@ -28,7 +27,7 @@ interface Message {
   book_search?: Book[];
 }
 
-// --- Карточка книги из базы ---
+// --- Карточка книги ---
 const BookCard: React.FC<{ book: Book; onClick: () => void }> = ({
   book,
   onClick,
@@ -109,9 +108,9 @@ const BookModal: React.FC<{
   </div>
 );
 
-// --- Шапка с логотипом ---
+// --- Фиксированный хедер ---
 const HeaderBar: React.FC = () => (
-  <div className="w-full border-b bg-white">
+  <div className="fixed top-0 w-full border-b bg-white z-50">
     <div className="mx-auto max-w-2xl flex items-center gap-3 px-4 py-3">
       <img
         src={LOGO_URL}
@@ -130,7 +129,7 @@ const HeaderBar: React.FC = () => (
   </div>
 );
 
-// --- Приветственный блок (до начала чата) ---
+// --- Приветственный блок ---
 const IntroCard: React.FC = () => (
   <div className="px-4 pt-4">
     <div className="mx-auto max-w-2xl bg-gradient-to-b from-blue-50 to-white border border-blue-100 rounded-2xl shadow-sm p-5">
@@ -159,14 +158,13 @@ const IntroCard: React.FC = () => (
   </div>
 );
 
-// --- Основной компонент чата ---
+// --- Основной компонент ---
 export const ChatBox: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [isTyping, setIsTyping] = useState(false);
 
-  // --- Показ первых 6 карточек, потом по 6 добавляем ---
   const [visibleBookCount, setVisibleBookCount] = useState(6);
   const [visibleVectorCount, setVisibleVectorCount] = useState(6);
 
@@ -184,16 +182,13 @@ export const ChatBox: React.FC = () => {
 
     try {
       const res = await fetchAIResponse(input);
-
       const aiMsg: Message = {
         role: "assistant",
         reply: res.reply,
         vector_search: res.vector_search,
         book_search: res.book_search,
       };
-
       setMessages((prev) => [...prev, aiMsg]);
-      // сбрасываем видимость при новом ответе
       setVisibleBookCount(9);
       setVisibleVectorCount(9);
     } catch (err) {
@@ -204,141 +199,143 @@ export const ChatBox: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col items-center w-full h-screen bg-gray-50">
-      {/* Шапка с логотипом */}
+    <div className="flex flex-col w-full h-screen bg-gray-50 overflow-hidden">
       <HeaderBar />
 
-      {/* Приветственный блок показываем, пока нет сообщений */}
-      {messages.length === 0 && <IntroCard />}
+      {/* Основной блок под хедером */}
+      <div className="flex flex-col flex-1 items-center pt-[72px] overflow-hidden">
+        {messages.length === 0 && <IntroCard />}
 
-      <div className="w-full max-w-2xl flex flex-col h-[calc(100vh-120px)] border-x bg-white shadow-sm mt-3">
-        {/* История чата */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-5">
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex flex-col ${
-                msg.role === "user" ? "items-end" : "items-start"
-              }`}
-            >
-              {msg.text && (
-                <div
-                  className={`rounded-2xl px-4 py-2 max-w-xs ${
-                    msg.role === "user"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-900"
-                  }`}
-                >
-                  {msg.text}
-                </div>
-              )}
+        <div className="w-full max-w-2xl flex flex-col flex-1 border-x bg-white shadow-sm">
+          {/* История чата */}
+    <div className="flex-1 overflow-y-auto p-3 space-y-4 mb-[56px]">
 
-              {msg.reply && (
-                <div
-                  className="mt-2 prose prose-sm max-w-none bg-gray-50 border rounded-xl p-3"
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(
-                      msg.reply.replace(/\n/g, "<br>")
-                    ),
-                  }}
-                />
-              )}
-
-              {/* Векторные карточки */}
-              {msg.vector_search && msg.vector_search.length > 0 && (
-                <div className="mt-3">
-                  <h4 className="text-xs text-gray-500 mb-1">
-                    Релевантные книги (векторный поиск)
-                  </h4>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {msg.vector_search
-                      .slice(0, visibleVectorCount)
-                      .map((book, j) => (
-                        <VectorCard
-                          key={j}
-                          book={book}
-                          onClick={() => setSelectedBook(book)}
-                        />
-                      ))}
+            {messages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex flex-col ${
+                  msg.role === "user" ? "items-end" : "items-start"
+                }`}
+              >
+                {msg.text && (
+                  <div
+                    className={`rounded-2xl px-4 py-2 max-w-xs ${
+                      msg.role === "user"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200 text-gray-900"
+                    }`}
+                  >
+                    {msg.text}
                   </div>
+                )}
 
-                  {msg.vector_search.length > visibleVectorCount && (
-                    <div className="flex justify-center mt-2">
-                      <button
-                        onClick={loadMoreVectors}
-                        className="text-xs px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                      >
-                        Загрузить ещё
-                      </button>
+                {msg.reply && (
+                  <div
+                    className="mt-2 prose prose-sm max-w-none bg-gray-50 border rounded-xl p-3"
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(
+                        msg.reply.replace(/\n/g, "<br>")
+                      ),
+                    }}
+                  />
+                )}
+
+                {/* Векторные карточки */}
+                {msg.vector_search && msg.vector_search.length > 0 && (
+                  <div className="mt-3">
+                    <h4 className="text-xs text-gray-500 mb-1">
+                      Релевантные книги (векторный поиск)
+                    </h4>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {msg.vector_search
+                        .slice(0, visibleVectorCount)
+                        .map((book, j) => (
+                          <VectorCard
+                            key={j}
+                            book={book}
+                            onClick={() => setSelectedBook(book)}
+                          />
+                        ))}
                     </div>
-                  )}
-                </div>
-              )}
 
-              {/* Базовые карточки */}
-              {msg.book_search && msg.book_search.length > 0 && (
-                <div className="mt-3">
-                  <h4 className="text-xs text-gray-500 mb-1">
-                    Найдено в базе книг
-                  </h4>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {msg.book_search
-                      .slice(0, visibleBookCount)
-                      .map((book, j) => (
-                        <BookCard
-                          key={j}
-                          book={book}
-                          onClick={() => setSelectedBook(book)}
-                        />
-                      ))}
+                    {msg.vector_search.length > visibleVectorCount && (
+                      <div className="flex justify-center mt-2">
+                        <button
+                          onClick={loadMoreVectors}
+                          className="text-xs px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                        >
+                          Загрузить ещё
+                        </button>
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  {msg.book_search.length > visibleBookCount && (
-                    <div className="flex justify-center mt-2">
-                      <button
-                        onClick={loadMoreBooks}
-                        className="text-xs px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-                      >
-                        Загрузить ещё
-                      </button>
+                {/* Базовые карточки */}
+                {msg.book_search && msg.book_search.length > 0 && (
+                  <div className="mt-3">
+                    <h4 className="text-xs text-gray-500 mb-1">
+                      Найдено в базе книг
+                    </h4>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {msg.book_search
+                        .slice(0, visibleBookCount)
+                        .map((book, j) => (
+                          <BookCard
+                            key={j}
+                            book={book}
+                            onClick={() => setSelectedBook(book)}
+                          />
+                        ))}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
 
-          {isTyping && (
-            <div className="flex items-center space-x-2 text-gray-500 text-sm">
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
-              <span>ИИ печатает...</span>
-            </div>
-          )}
-        </div>
+                    {msg.book_search.length > visibleBookCount && (
+                      <div className="flex justify-center mt-2">
+                        <button
+                          onClick={loadMoreBooks}
+                          className="text-xs px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                        >
+                          Загрузить ещё
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
 
-        {/* Поле ввода */}
-        <form
-          onSubmit={sendMessage}
-          className="border-t p-3 flex gap-2 bg-gray-50"
-        >
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Введите запрос к ИИ..."
-            className="flex-1 border rounded-xl px-3 py-2 focus:outline-none"
-          />
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl"
+            {isTyping && (
+              <div className="flex items-center space-x-2 text-gray-500 text-sm">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                <span>ИИ печатает...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Поле ввода */}
+          <form
+            onSubmit={sendMessage}
+            className="border-t p-3 flex gap-2 bg-gray-50 shrink-0"
           >
-            Отправить
-          </button>
-        </form>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Введите запрос к ИИ..."
+              className="flex-1 border rounded-xl px-3 py-2 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl"
+            >
+              Отправить
+            </button>
+          </form>
+        </div>
       </div>
 
-      {/* Модальное окно книги */}
+      {/* Модальное окно */}
       {selectedBook && (
         <BookModal
           book={selectedBook}
