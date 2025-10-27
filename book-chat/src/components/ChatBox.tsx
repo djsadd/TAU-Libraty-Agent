@@ -3,7 +3,6 @@ import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
 
 const LOGO_URL = "/images/logorgb.png";
-const [modalMode, setModalMode] = useState<"vector" | "book" | null>(null); // NEW
 
 /* ==========================
  * Вспомогательное
@@ -224,6 +223,8 @@ export const ChatBox: React.FC = () => {
   const [visibleVectorCount, setVisibleVectorCount] = useState(6);
 
   const [isAuth, setIsAuth] = useState(isAuthenticated());
+    const [modalMode, setModalMode] = useState<"vector" | "book" | null>(null); // NEW
+
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
