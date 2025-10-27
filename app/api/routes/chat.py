@@ -18,7 +18,7 @@ from app.models.chat import ChatHistory
 router = APIRouter(prefix="/api", tags=["chat", "chat_card"])
 from app.core.db import SessionLocal
 import re
-
+from fastapi.responses import StreamingResponse
 from app.models.books import Document
 
 def clean_context(text: str) -> str:
@@ -343,16 +343,6 @@ async def chat(req: ChatRequest,
     tasks = [summarize_card_limited(llm, req, card) for card in vector_cards_dictionary.items()]
     annotated_vector_cards = await asyncio.gather(*tasks)
 
-    # context = "\n\n".join([
-    #     f"[{d.metadata.get('title', '')}] {clean_context(d.page_content[:800])}"
-    #     for d in vec_docs
-    # ])
-    # text_prompt = ChatPromptTemplate.from_messages([
-    #     ("system", "Ты — интеллектуальный помощник университета Туран-Астана. Отвечай строго по контексту."),
-    #     ("human", f"Вопрос студента: {req.query}\n\nКонтекст:\n{context}")
-    # ])
-    # final_answer = llm.invoke(text_prompt.format_messages()).content
-
     save_chat_history(
         db=db,
         session_id=session_id,
@@ -366,3 +356,12 @@ async def chat(req: ChatRequest,
         "book_search": kb_map,
         "vector_search": annotated_vector_cards
     }
+
+
+@router.post("/generate_llm_context")
+def generate_llm_context():
+    def text_stream():
+        text = "Данная книга подходит отлично так как..."
+        for chunk in text.split():
+            yield chunk + " "
+    return StreamingResponse(text_stream(), media_type="text/plain")
