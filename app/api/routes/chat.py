@@ -236,26 +236,26 @@ async def summarize_card(llm, req, card):
     for i in range(len(value["pages"])):
         context += "стр." + str(value["pages"][i]) + "\n"
         context += "фрагмент" + value["text_snippets"][i] + "\n"
-    system_role = (
-        "Ты — академический помощник. Кратко объясни, "
-        "почему этот источник может быть полезен студенту по данному вопросу."
-        "Ответ давай в формате: стр. X - объяснение. По всем страницам переданные тебе."
-    )
-    human_msg = (
-        f"Вопрос: {req.query}\n\n"
-        f"Источник: {value['title']}\n\n"
-        f"Фрагмент: {context}"
-    )
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_role),
-        ("human", human_msg)
-    ])
-    response = await llm.ainvoke(prompt.format_messages())  # <-- async вызов
+    # system_role = (
+    #     "Ты — академический помощник. Кратко объясни, "
+    #     "почему этот источник может быть полезен студенту по данному вопросу."
+    #     "Ответ давай в формате: стр. X - объяснение. По всем страницам переданные тебе."
+    # )
+    # human_msg = (
+    #     f"Вопрос: {req.query}\n\n"
+    #     f"Источник: {value['title']}\n\n"
+    #     f"Фрагмент: {context}"
+    # )
+    # prompt = ChatPromptTemplate.from_messages([
+    #     ("system", system_role),
+    #     ("human", human_msg)
+    # ])
+    # response = await llm.ainvoke(prompt.format_messages())  # <-- async вызов
     return {
         'title': value["title"],
         'download_url': value['download_url'],
         "text_snippet": context,
-        "summary": response.content
+        # "summary": response.content
             }
 
 
