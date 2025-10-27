@@ -103,8 +103,7 @@ const BookModal: React.FC<{ book: Book; aiComment?: string; onClose: () => void 
 
 /* ==========================
  * Фиксированный хедер
- * ========================== */
-const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth, onLogout }) => (
+ * ========================== */const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth, onLogout }) => (
   <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
     <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
       {/* Логотип и подпись */}
@@ -117,14 +116,25 @@ const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth
       </div>
 
       {/* Кнопки справа */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
         {isAuth ? (
-          <button
-            onClick={onLogout}
-            className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
-          >
-            Выйти
-          </button>
+          <>
+            {/* Профиль */}
+            <button
+              onClick={() => (window.location.href = "/profile")}
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+            >
+              Профиль
+            </button>
+
+            {/* Выйти */}
+            <button
+              onClick={onLogout}
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-red-500/90 text-white hover:bg-red-600 transition"
+            >
+              Выйти
+            </button>
+          </>
         ) : (
           <>
             <button
