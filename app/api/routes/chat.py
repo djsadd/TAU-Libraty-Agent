@@ -383,7 +383,7 @@ class LLMContextRequest(BaseModel):
 async def generate_llm_context(payload: LLMContextRequest, current_user: User = Depends(get_current_user)):
     system_role = (
         "Ты — академический помощник. Кратко объясни, "
-        "почему этот источник может быть полезен студенту по данному вопросу. "
+        "почему этот источник может быть полезен именно этому студенту по данному вопросу. "
         "Ответ давай в формате: стр. X - объяснение. По всем страницам переданные тебе."
     )
     human_msg = (
@@ -392,7 +392,7 @@ async def generate_llm_context(payload: LLMContextRequest, current_user: User = 
         f"Фрагмент: {payload.text_snippet}"
         f"Пользователь: {current_user.full_name}, Специальность пользователя: {current_user.educational_program}"
     )
-
+    print(current_user.full_name)
     # Подготовка сообщений под ваш LLM/LC
     from langchain.prompts import ChatPromptTemplate
     prompt = ChatPromptTemplate.from_messages([
