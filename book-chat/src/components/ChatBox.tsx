@@ -286,66 +286,77 @@ export const ChatBox: React.FC = () => {
   }
 
   // ======= Открытие векторной карточки с ленивым стримом =======
-  function openVectorBook(book: Book, q?: string) {
-    setModalMode("vector"); // NEW
+  // ======= Открытие векторной карточки с ленивым стримом =======
+function openVectorBook(book: Book, q?: string) {
+  // 1) Сначала выбираем книгу и включаем модалку
+  setSelectedBook(book);
+  setModalMode("vector");
 
-    const key = ctxKey(book);
-    if (ctxCache[key]) return; // уже сгенерировано — просто покажем
+  const key = ctxKey(book);
 
-    // прерываем предыдущий стрим, если идёт
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-
-    setLoadingKey(key);
-
-    (async () => {
-      try {
-        const token = getAuthToken();
-        const payload = {
-          id_book: book.id_book || undefined,
-          title: book.title,
-          query: (q && q.trim()) || lastQueryRef.current || book.title, // ← сюда кладём query
-          page: normalizePage(book.page || ""),
-          text_snippet: book.text_snippet || undefined,
-        };
-
-        const resp = await fetch("/api/generate_llm_context", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(payload),
-          signal: ac.signal,
-        });
-
-        if (!resp.ok || !resp.body) {
-          const errText = await resp.text().catch(() => "");
-          console.error("LLM ctx error", resp.status, errText);
-          throw new Error("Bad response");
-        }
-
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let acc = "";
-
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          acc += decoder.decode(value, { stream: true });
-          setCtxCache((prev) => ({ ...prev, [key]: acc })); // обновляем кэш на лету
-        }
-
-        acc += new TextDecoder().decode();
-        setCtxCache((prev) => ({ ...prev, [key]: acc.trim() }));
-      } catch (e: any) {
-        if (e?.name !== "AbortError") console.error(e);
-      } finally {
-        setLoadingKey(null);
-      }
-    })();
+  // 2) Если уже есть кэш — просто покажем его в модалке (selectedBook уже выставлен)
+  if (ctxCache[key]) {
+    return;
   }
+
+  // 3) Дальше — как было: обрываем прошлый стрим и стартуем новый
+  abortRef.current?.abort();
+  const ac = new AbortController();
+  abortRef.current = ac;
+
+  setLoadingKey(key);
+
+  (async () => {
+    try {
+      const token = getAuthToken();
+      const payload = {
+        id_book: book.id_book || undefined,
+        title: book.title,
+        query: (q && q.trim()) || lastQueryRef.current || book.title,
+        page: normalizePage(book.page || ""),
+        text_snippet: book.text_snippet || undefined,
+      };
+
+      const resp = await fetch("/api/generate_llm_context", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        signal: ac.signal,
+      });
+
+      if (!resp.ok || !resp.body) {
+        const errText = await resp.text().catch(() => "");
+        console.error("LLM ctx error", resp.status, errText);
+        throw new Error("Bad response");
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+
+      // (необязательно, но полезно: пустая строка в кэше сразу покажет, что «что-то уже идёт»)
+      setCtxCache(prev => ({ ...prev, [key]: "" }));
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        setCtxCache(prev => ({ ...prev, [key]: acc }));
+      }
+
+      acc += new TextDecoder().decode();
+      setCtxCache(prev => ({ ...prev, [key]: acc.trim() }));
+    } catch (e: any) {
+      if (e?.name !== "AbortError") console.error(e);
+    } finally {
+      setLoadingKey(null);
+    }
+  })();
+}
+
 
     function closeModal() {
       abortRef.current?.abort();
