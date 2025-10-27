@@ -333,7 +333,6 @@ async def chat(req: ChatRequest,
                 vector_cards_dictionary[doc.id_book]["title"] = record.title
                 vector_cards_dictionary[doc.id_book]["download_url"] = record.download_url
 
-
     tasks = [summarize_card(llm, req, card) for card in vector_cards_dictionary.items()]
     annotated_vector_cards = await asyncio.gather(*tasks)
 
