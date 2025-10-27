@@ -125,21 +125,18 @@ export function LoginPage() {
           body: form.toString(),
         });
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data?.message || "Не удалось войти");
-    }
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data?.detail || data?.message || "Не удалось войти");
+        }
 
-    // НОВОЕ: читаем json и сохраняем токен
-    const data = await res.json(); // ожидаем { access_token, token_type?, refresh_token? ... }
-    const storage = remember ? localStorage : sessionStorage;
-    if (data?.access_token) {
-      storage.setItem("token", data.access_token);
-      if (data?.token_type) storage.setItem("token_type", data.token_type); // опционально
-      if (data?.refresh_token) storage.setItem("refresh_token", data.refresh_token); // если есть
-    }
-
-    navigate("/app");
+        const data = await res.json(); // { access_token, token_type: "bearer" }
+        const storage = remember ? localStorage : sessionStorage;
+        if (data?.access_token) {
+          storage.setItem("token", data.access_token);
+          storage.setItem("token_type", data.token_type ?? "Bearer");
+        }
+        navigate("/app");
 
     } catch (e: any) {
       setError(e.message);
