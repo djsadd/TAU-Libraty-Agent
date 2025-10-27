@@ -336,12 +336,12 @@ async def chat(req: ChatRequest,
 
     semaphore = asyncio.Semaphore(3)
 
-    async def summarize_card_limited(llm, req, card):
-        async with semaphore:
-            return await summarize_card(llm, req, card)
-
-    tasks = [summarize_card_limited(llm, req, card) for card in vector_cards_dictionary.items()]
-    annotated_vector_cards = await asyncio.gather(*tasks)
+    # async def summarize_card_limited(llm, req, card):
+    #     async with semaphore:
+    #         return await summarize_card(llm, req, card)
+    #
+    # tasks = [summarize_card_limited(llm, req, card) for card in vector_cards_dictionary.items()]
+    # annotated_vector_cards = await asyncio.gather(*tasks)
 
     save_chat_history(
         db=db,
@@ -354,7 +354,7 @@ async def chat(req: ChatRequest,
     return {
         "reply": "В библиотеке найдены следующие книги: ",
         "book_search": kb_map,
-        "vector_search": annotated_vector_cards
+        "vector_search": vector_cards_dictionary
     }
 
 
