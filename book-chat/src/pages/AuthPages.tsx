@@ -112,7 +112,7 @@ export function LoginPage() {
     try {
       setLoading(true);
       // Подключите свой API: /api/auth/login
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, remember })
@@ -282,7 +282,7 @@ export function RegisterPage() {
         phone_number: phoneClean(phoneNumber),
       };
 
-      const res = await fetch("/register", {
+      const res = await fetch("/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
