@@ -366,7 +366,6 @@ function openVectorBook(book: Book, q?: string) {
   })();
 }
 
-
     function closeModal() {
       abortRef.current?.abort();
       setLoadingKey(null);              // ← добавь

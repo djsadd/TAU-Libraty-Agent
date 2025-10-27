@@ -362,8 +362,6 @@ class LLMContextRequest(BaseModel):
     text_snippet: str
     title: str
     query: str
-
-
 @router.post("/generate_llm_context")
 async def generate_llm_context(request: LLMContextRequest):
     async def text_stream():
@@ -385,12 +383,9 @@ async def generate_llm_context(request: LLMContextRequest):
 
         llm = get_llm()
 
-        response = await llm.ainvoke(prompt.format_messages())
-
-        result_text = getattr(response, "content", str(response))
-
-        for chunk in result_text.split():
-            yield chunk + " "
-            await asyncio.sleep(0.05)
+        # Реальный стриминг от LLM:
+        async for chunk in llm.astream(prompt.format_messages()):
+            if chunk.content:
+                yield chunk.content
 
     return StreamingResponse(text_stream(), media_type="text/plain")
