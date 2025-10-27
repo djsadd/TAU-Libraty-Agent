@@ -64,46 +64,58 @@ const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onCli
 );
 
 /* ==========================
- * Модалка книги
+ * Модалка книги (умеет показывать стрим)
  * ========================== */
-const BookModal: React.FC<{ book: Book; aiComment?: string; onClose: () => void }> = ({
-  book,
-  aiComment,
-  onClose,
-}) => (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative border border-tau-primary/15">
-      <button
-        onClick={onClose}
-        className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
-        aria-label="Закрыть"
-      >
-        ✕
-      </button>
+const BookModal: React.FC<{
+  book: Book;
+  aiComment?: string; // fallback
+  streamed?: string;  // текст, который приходит потоково и/или из кэша
+  loading?: boolean;  // флажок загрузки
+  onClose: () => void;
+}> = ({ book, aiComment, streamed, loading, onClose }) => {
+  const html = (streamed || book.summary || aiComment || "").replace(/\n/g, "<br>");
 
-      <h2 className="text-xl font-semibold text-tau-primary mb-1">{book.title}</h2>
-      {book.author && <p className="text-sm text-gray-600">{book.author}</p>}
-      {book.year && <p className="text-sm text-gray-600">{book.year}</p>}
-      {book.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative border border-tau-primary/15">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+          aria-label="Закрыть"
+        >
+          ✕
+        </button>
 
-      {(aiComment || book.summary) && (
-        <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700">
-          <div
-            dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(
-                (book.summary || aiComment || "").replace(/\n/g, "<br>")
-              ),
-            }}
-          />
+        <h2 className="text-xl font-semibold text-tau-primary mb-1">{book.title}</h2>
+        {book.author && <p className="text-sm text-gray-600">{book.author}</p>}
+        {book.year && <p className="text-sm text-gray-600">{book.year}</p>}
+        {book.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
+
+        <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[96px]">
+          {loading && (
+            <div className="flex items-center gap-2 text-tau-primary mb-2">
+              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce" />
+              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-100" />
+              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-200" />
+              <span>Генерирую контекст…</span>
+            </div>
+          )}
+
+          {(streamed || aiComment || book.summary) ? (
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
+          ) : (
+            !loading && <div className="text-gray-500">Нет данных.</div>
+          )}
         </div>
-      )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /* ==========================
  * Фиксированный хедер
- * ========================== */const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth, onLogout }) => (
+ * ========================== */
+const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth, onLogout }) => (
   <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
     <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
       {/* Логотип и подпись */}
@@ -119,15 +131,12 @@ const BookModal: React.FC<{ book: Book; aiComment?: string; onClose: () => void 
       <div className="flex gap-2 items-center">
         {isAuth ? (
           <>
-            {/* Профиль */}
             <button
               onClick={() => (window.location.href = "/profile")}
               className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
             >
               Профиль
             </button>
-
-            {/* Выйти */}
             <button
               onClick={onLogout}
               className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-red-500/90 text-white hover:bg-red-600 transition"
@@ -196,6 +205,16 @@ export const ChatBox: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  // ======= КЭШ + управление стримом =======
+  // Ключ = id_book + page (если нет id — используем title)
+  function ctxKey(b: Book) {
+    return `${b.id_book || b.title || "no-id"}::${b.page || "n/a"}`;
+  }
+
+  const [ctxCache, setCtxCache] = useState<Record<string, string>>({});
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
   const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
   const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
 
@@ -203,8 +222,6 @@ export const ChatBox: React.FC = () => {
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
     setIsAuth(false);
-    // Если у тебя серверная сессия/куки: дерни /auth/logout и чисти куки
-    // window.location.href = "/login";
   };
 
   async function sendMessage(e: React.FormEvent) {
@@ -234,6 +251,67 @@ export const ChatBox: React.FC = () => {
     }
   }
 
+  // ======= Открытие векторной карточки с ленивым стримом =======
+  function openVectorBook(book: Book) {
+    setSelectedBook(book);
+
+    const key = ctxKey(book);
+    // если уже есть в кэше — просто показываем
+    if (ctxCache[key]) return;
+
+    // прерываем предыдущий стрим, если ещё идёт
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    setLoadingKey(key);
+
+    (async () => {
+      try {
+        // подстрой body под контракт бэкенда
+        const resp = await fetch("/api/generate_llm_context", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id_book: book.id_book,
+            title: book.title,
+            page: book.page,
+          }),
+          signal: ac.signal,
+        });
+
+        if (!resp.ok || !resp.body) throw new Error("Bad response");
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let acc = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          acc += decoder.decode(value, { stream: true });
+
+          // обновляем кэш «по ходу»
+          setCtxCache((prev) => ({ ...prev, [key]: acc }));
+        }
+
+        // финальный докод
+        acc += new TextDecoder().decode();
+        setCtxCache((prev) => ({ ...prev, [key]: acc.trim() }));
+      } catch (e: any) {
+        if (e?.name !== "AbortError") console.error(e);
+      } finally {
+        setLoadingKey(null);
+      }
+    })();
+  }
+
+  // закрытие модалки — гасим активный стрим
+  function closeModal() {
+    abortRef.current?.abort();
+    setSelectedBook(null);
+  }
+
   // автоскролл
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -248,10 +326,15 @@ export const ChatBox: React.FC = () => {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // лёгкий триггер обновить auth-состояние (можешь заменить на свой)
+  // лёгкий триггер обновить auth-состояние
   useEffect(() => {
     setIsAuth(isAuthenticated());
   }, [messages.length]);
+
+  // на размонтирование компонента — оборвать стрим
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   return (
     <div className="fixed inset-0 flex flex-col w-full bg-gray-50 overflow-hidden">
@@ -285,11 +368,11 @@ export const ChatBox: React.FC = () => {
                 )}
 
                 {msg.vector_search && msg.vector_search.length > 0 && (
-                  <div className="mt-3">
+                  <div className="mt-3 w-full">
                     <h4 className="text-xs text-gray-500 mb-1">Релевантные книги (векторный поиск)</h4>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {msg.vector_search.slice(0, visibleVectorCount).map((book, j) => (
-                        <VectorCard key={j} book={book} onClick={() => setSelectedBook(book)} />
+                        <VectorCard key={j} book={book} onClick={() => openVectorBook(book)} />
                       ))}
                     </div>
 
@@ -307,7 +390,7 @@ export const ChatBox: React.FC = () => {
                 )}
 
                 {msg.book_search && msg.book_search.length > 0 && (
-                  <div className="mt-3">
+                  <div className="mt-3 w-full">
                     <h4 className="text-xs text-gray-500 mb-1">Найдено в базе книг</h4>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {msg.book_search.slice(0, visibleBookCount).map((book, j) => (
@@ -364,7 +447,9 @@ export const ChatBox: React.FC = () => {
         <BookModal
           book={selectedBook}
           aiComment={messages[messages.length - 1]?.reply}
-          onClose={() => setSelectedBook(null)}
+          streamed={ctxCache[ctxKey(selectedBook)]}
+          loading={loadingKey === ctxKey(selectedBook)}
+          onClose={closeModal}
         />
       )}
     </div>
