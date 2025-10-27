@@ -362,30 +362,45 @@ class LLMContextRequest(BaseModel):
     text_snippet: str
     title: str
     query: str
+
+
 @router.post("/generate_llm_context")
-async def generate_llm_context(request: LLMContextRequest):
-    async def text_stream():
-        system_role = (
-            "Ты — академический помощник. Кратко объясни, "
-            "почему этот источник может быть полезен студенту по данному вопросу. "
-            "Ответ давай в формате: стр. X - объяснение. По всем страницам переданные тебе."
-        )
-        human_msg = (
-            f"Вопрос: {request.query}\n\n"
-            f"Источник: {request.title}\n\n"
-            f"Фрагмент: {request.text_snippet}"
-        )
+async def generate_llm_context(payload: LLMContextRequest):
+    system_role = (
+        "Ты — академический помощник. Кратко объясни, "
+        "почему этот источник может быть полезен студенту по данному вопросу. "
+        "Ответ давай в формате: стр. X - объяснение. По всем страницам переданные тебе."
+    )
+    human_msg = (
+        f"Вопрос: {payload.query}\n\n"
+        f"Источник: {payload.title}\n\n"
+        f"Фрагмент: {payload.text_snippet}"
+    )
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", system_role),
-            ("human", human_msg)
-        ])
+    # Подготовка сообщений под ваш LLM/LC
+    from langchain.prompts import ChatPromptTemplate
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_role),
+        ("human", human_msg),
+    ])
+    msgs = prompt.format_messages()
 
-        llm = get_llm()
+    llm = get_llm()  # ДОЛЖЕН поддерживать streaming=True
 
-        # Реальный стриминг от LLM:
-        async for chunk in llm.astream(prompt.format_messages()):
-            if chunk.content:
-                yield chunk.content
+    async def gen():
+        yield " \n"
 
-    return StreamingResponse(text_stream(), media_type="text/plain")
+        async for chunk in llm.astream(msgs):
+            text = getattr(chunk, "content", None)
+            if text:
+                yield text
+                await asyncio.sleep(0)
+
+        yield "\n"
+
+    headers = {
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",  # для nginx
+        "Connection": "keep-alive",
+    }
+    return StreamingResponse(gen(), media_type="text/plain; charset=utf-8", headers=headers)

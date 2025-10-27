@@ -18,4 +18,5 @@ llm = ChatOpenAI(
     openai_api_key=settings.OPENAI_SECRET_KEY,
     temperature=0.0,
     max_tokens=2048,
+    streaming=True,  # ← ОБЯЗАТЕЛЬНО!
 )
