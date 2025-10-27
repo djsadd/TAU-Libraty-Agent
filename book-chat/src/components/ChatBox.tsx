@@ -73,16 +73,17 @@ const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onCli
  * Модалка книги (стрим в тело)
  * ========================== */
 const BookModal: React.FC<{
-  variant: "vector" | "book";       // <— NEW
-  book?: Book;                      // <— теперь опционально
+  variant: "vector" | "book";
+  book?: Book;
   aiComment?: string;
-  streamed?: string;
-  loading?: boolean;
+  streamed?: string;   // набегающий текст
+  loading?: boolean;   // идёт ли стрим
   onClose: () => void;
 }> = ({ variant, book, aiComment, streamed, loading, onClose }) => {
-  // Для 'book' оставляем старую логику, для 'vector' — только стрим
+  // Для 'book' — статический текст; для 'vector' — стрим
   const htmlBook = (book?.summary || aiComment || "").replace(/\n/g, "<br>");
-  const htmlVector = (streamed || "").replace(/\n/g, "<br>");
+  // Важно: используем nullish coalescing, чтобы отличать undefined от пустой строки
+  const htmlVector = (streamed ?? "").replace(/\n/g, "<br>");
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -104,26 +105,33 @@ const BookModal: React.FC<{
 
             <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[96px]">
               {(book?.summary || aiComment) ? (
-                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlBook) }} />
+                <div
+                  className="whitespace-pre-wrap leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlBook) }}
+                />
               ) : (
                 <div className="text-gray-500">Нет данных.</div>
               )}
             </div>
           </>
         ) : (
-          // === variant === 'vector' — только стрим ===
+          // === variant === 'vector' — показываем текст сразу, даже если он пока пустой ===
           <div className="mt-1">
+            {loading && (
+              <div className="flex items-center gap-2 text-tau-primary mb-2">
+                <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce" />
+                <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-100" />
+                <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-200" />
+                <span>Печатаю…</span>
+              </div>
+            )}
+
             <div className="p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[120px]">
-              {loading && (
-                <div className="flex items-center gap-2 text-tau-primary mb-2">
-                  <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce" />
-                  <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-100" />
-                  <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-200" />
-                  <span>Генерирую контекст…</span>
-                </div>
-              )}
-              {streamed ? (
-                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlVector) }} />
+              {typeof streamed === "string" ? (
+                <div
+                  className="whitespace-pre-wrap leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlVector) }}
+                />
               ) : (
                 !loading && <div className="text-gray-500">Нет данных.</div>
               )}
@@ -134,6 +142,7 @@ const BookModal: React.FC<{
     </div>
   );
 };
+
 
 /* ==========================
  * Фиксированный хедер
@@ -360,9 +369,11 @@ function openVectorBook(book: Book, q?: string) {
 
     function closeModal() {
       abortRef.current?.abort();
+      setLoadingKey(null);              // ← добавь
       setSelectedBook(null);
-      setModalMode(null); // NEW
+      setModalMode(null);
     }
+
 
   // автоскролл
   useEffect(() => {
