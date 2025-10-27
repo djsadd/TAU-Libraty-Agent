@@ -3,6 +3,7 @@ import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
 
 const LOGO_URL = "/images/logorgb.png";
+const [modalMode, setModalMode] = useState<"vector" | "book" | null>(null); // NEW
 
 /* ==========================
  * Вспомогательное
@@ -73,13 +74,16 @@ const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onCli
  * Модалка книги (стрим в тело)
  * ========================== */
 const BookModal: React.FC<{
-  book: Book;
+  variant: "vector" | "book";       // <— NEW
+  book?: Book;                      // <— теперь опционально
   aiComment?: string;
   streamed?: string;
   loading?: boolean;
   onClose: () => void;
-}> = ({ book, aiComment, streamed, loading, onClose }) => {
-  const html = (streamed || book.summary || aiComment || "").replace(/\n/g, "<br>");
+}> = ({ variant, book, aiComment, streamed, loading, onClose }) => {
+  // Для 'book' оставляем старую логику, для 'vector' — только стрим
+  const htmlBook = (book?.summary || aiComment || "").replace(/\n/g, "<br>");
+  const htmlVector = (streamed || "").replace(/\n/g, "<br>");
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
@@ -92,27 +96,41 @@ const BookModal: React.FC<{
           ✕
         </button>
 
-        <h2 className="text-xl font-semibold text-tau-primary mb-1">{book.title}</h2>
-        {book.author && <p className="text-sm text-gray-600">{book.author}</p>}
-        {book.year && <p className="text-sm text-gray-600">{book.year}</p>}
-        {book.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
+        {variant === "book" ? (
+          <>
+            <h2 className="text-xl font-semibold text-tau-primary mb-1">{book?.title}</h2>
+            {book?.author && <p className="text-sm text-gray-600">{book.author}</p>}
+            {book?.year && <p className="text-sm text-gray-600">{book.year}</p>}
+            {book?.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
 
-        <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[96px]">
-          {loading && (
-            <div className="flex items-center gap-2 text-tau-primary mb-2">
-              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce" />
-              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-100" />
-              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-200" />
-              <span>Генерирую контекст…</span>
+            <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[96px]">
+              {(book?.summary || aiComment) ? (
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlBook) }} />
+              ) : (
+                <div className="text-gray-500">Нет данных.</div>
+              )}
             </div>
-          )}
-
-          {(streamed || aiComment || book.summary) ? (
-            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
-          ) : (
-            !loading && <div className="text-gray-500">Нет данных.</div>
-          )}
-        </div>
+          </>
+        ) : (
+          // === variant === 'vector' — только стрим ===
+          <div className="mt-1">
+            <div className="p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[120px]">
+              {loading && (
+                <div className="flex items-center gap-2 text-tau-primary mb-2">
+                  <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce" />
+                  <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-100" />
+                  <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-200" />
+                  <span>Генерирую контекст…</span>
+                </div>
+              )}
+              {streamed ? (
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlVector) }} />
+              ) : (
+                !loading && <div className="text-gray-500">Нет данных.</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -268,7 +286,7 @@ export const ChatBox: React.FC = () => {
 
   // ======= Открытие векторной карточки с ленивым стримом =======
   function openVectorBook(book: Book, q?: string) {
-    setSelectedBook(book);
+    setModalMode("vector"); // NEW
 
     const key = ctxKey(book);
     if (ctxCache[key]) return; // уже сгенерировано — просто покажем
@@ -328,10 +346,11 @@ export const ChatBox: React.FC = () => {
     })();
   }
 
-  function closeModal() {
-    abortRef.current?.abort();
-    setSelectedBook(null);
-  }
+    function closeModal() {
+      abortRef.current?.abort();
+      setSelectedBook(null);
+      setModalMode(null); // NEW
+    }
 
   // автоскролл
   useEffect(() => {
@@ -410,26 +429,34 @@ export const ChatBox: React.FC = () => {
                 )}
 
                 {msg.book_search && msg.book_search.length > 0 && (
-                  <div className="mt-3 w-full">
-                    <h4 className="text-xs text-gray-500 mb-1">Найдено в базе книг</h4>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {msg.book_search.slice(0, visibleBookCount).map((book, j) => (
-                        <BookCard key={j} book={book} onClick={() => setSelectedBook(book)} />
-                      ))}
-                    </div>
+  <div className="mt-3 w-full">
+    <h4 className="text-xs text-gray-500 mb-1">Найдено в базе книг</h4>
+    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      {msg.book_search.slice(0, visibleBookCount).map((book, j) => (
+        <BookCard
+          key={j}
+          book={book}
+          onClick={() => {
+            setSelectedBook(book);
+            setModalMode("book"); // <-- новый режим
+          }}
+        />
+      ))}
+    </div>
 
-                    {msg.book_search.length > visibleBookCount && (
-                      <div className="flex justify-center mt-2">
-                        <button
-                          className="text-xs px-3 py-1 bg-tau-primary hover:bg-tau-hover text-white rounded-lg transition"
-                          onClick={loadMoreBooks}
-                        >
-                          Загрузить ещё
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+    {msg.book_search.length > visibleBookCount && (
+      <div className="flex justify-center mt-2">
+        <button
+          className="text-xs px-3 py-1 bg-tau-primary hover:bg-tau-hover text-white rounded-lg transition"
+          onClick={loadMoreBooks}
+        >
+          Загрузить ещё
+        </button>
+      </div>
+    )}
+  </div>
+)}
+
               </div>
             ))}
 
@@ -463,15 +490,23 @@ export const ChatBox: React.FC = () => {
         </div>
       </div>
 
-      {selectedBook && (
-        <BookModal
-          book={selectedBook}
-          aiComment={messages[messages.length - 1]?.reply}
-          streamed={ctxCache[ctxKey(selectedBook)]}
-          loading={loadingKey === ctxKey(selectedBook)}
-          onClose={closeModal}
-        />
-      )}
+      {modalMode && (
+  <BookModal
+    variant={modalMode} // NEW
+    book={modalMode === "book" ? selectedBook ?? undefined : undefined}
+    aiComment={modalMode === "book" ? messages[messages.length - 1]?.reply : undefined}
+    streamed={
+      modalMode === "vector" && selectedBook
+        ? ctxCache[ctxKey(selectedBook)]
+        : undefined
+    }
+    loading={modalMode === "vector" && selectedBook
+      ? loadingKey === ctxKey(selectedBook)
+      : false}
+    onClose={closeModal}
+  />
+)}
+
     </div>
   );
 };
