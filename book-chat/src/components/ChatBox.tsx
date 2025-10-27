@@ -7,9 +7,16 @@ const LOGO_URL = "/images/logorgb.png";
 /* ==========================
  * Вспомогательное
  * ========================== */
-// простая проверка авторизации: есть ли токен в localStorage / sessionStorage
 function isAuthenticated() {
   return !!(localStorage.getItem("token") || sessionStorage.getItem("token"));
+}
+function getAuthToken() {
+  return localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+}
+function normalizePage(p?: string | null) {
+  if (!p) return undefined;
+  const n = Number(p);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 /* ==========================
@@ -28,7 +35,6 @@ interface Book {
   cover?: string;
   page?: string | null;
 }
-
 interface Message {
   role: "user" | "assistant";
   text?: string;
@@ -64,13 +70,13 @@ const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onCli
 );
 
 /* ==========================
- * Модалка книги (умеет показывать стрим)
+ * Модалка книги (стрим в тело)
  * ========================== */
 const BookModal: React.FC<{
   book: Book;
-  aiComment?: string; // fallback
-  streamed?: string;  // текст, который приходит потоково и/или из кэша
-  loading?: boolean;  // флажок загрузки
+  aiComment?: string;
+  streamed?: string;
+  loading?: boolean;
   onClose: () => void;
 }> = ({ book, aiComment, streamed, loading, onClose }) => {
   const html = (streamed || book.summary || aiComment || "").replace(/\n/g, "<br>");
@@ -118,7 +124,6 @@ const BookModal: React.FC<{
 const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth, onLogout }) => (
   <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
     <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
-      {/* Логотип и подпись */}
       <div className="flex items-center gap-3">
         <img src={LOGO_URL} alt="TAU Library" className="h-8 w-8 rounded-lg object-contain" />
         <div className="flex flex-col leading-tight">
@@ -127,7 +132,6 @@ const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth
         </div>
       </div>
 
-      {/* Кнопки справа */}
       <div className="flex gap-2 items-center">
         {isAuth ? (
           <>
@@ -205,12 +209,11 @@ export const ChatBox: React.FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // ======= КЭШ + управление стримом =======
-  // Ключ = id_book + page (если нет id — используем title)
+  // ======= lastQuery + кэш + стрим =======
+  const lastQueryRef = useRef<string>("");
   function ctxKey(b: Book) {
     return `${b.id_book || b.title || "no-id"}::${b.page || "n/a"}`;
   }
-
   const [ctxCache, setCtxCache] = useState<Record<string, string>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -226,15 +229,18 @@ export const ChatBox: React.FC = () => {
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
-    if (!input.trim()) return;
+    const q = input.trim();
+    if (!q) return;
 
-    const userMsg: Message = { role: "user", text: input };
+    lastQueryRef.current = q; // запомним последний запрос пользователя
+
+    const userMsg: Message = { role: "user", text: q };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
 
     try {
-      const res = await fetchAIResponse(input);
+      const res = await fetchAIResponse(q);
       const aiMsg: Message = {
         role: "assistant",
         reply: res.reply,
@@ -251,15 +257,23 @@ export const ChatBox: React.FC = () => {
     }
   }
 
+  // связанный query для конкретного ассистентского сообщения (индекса i)
+  function getQueryForAssistantIndex(idx: number) {
+    for (let k = idx - 1; k >= 0; k--) {
+      const m = messages[k];
+      if (m.role === "user" && m.text?.trim()) return m.text.trim();
+    }
+    return lastQueryRef.current || "";
+  }
+
   // ======= Открытие векторной карточки с ленивым стримом =======
-  function openVectorBook(book: Book) {
+  function openVectorBook(book: Book, q?: string) {
     setSelectedBook(book);
 
     const key = ctxKey(book);
-    // если уже есть в кэше — просто показываем
-    if (ctxCache[key]) return;
+    if (ctxCache[key]) return; // уже сгенерировано — просто покажем
 
-    // прерываем предыдущий стрим, если ещё идёт
+    // прерываем предыдущий стрим, если идёт
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
@@ -268,21 +282,30 @@ export const ChatBox: React.FC = () => {
 
     (async () => {
       try {
-        // подстрой body под контракт бэкенда
+        const token = getAuthToken();
+        const payload = {
+          id_book: book.id_book || undefined,
+          title: book.title,
+          query: (q && q.trim()) || lastQueryRef.current || book.title, // ← сюда кладём query
+          page: normalizePage(book.page || ""),
+          text_snippet: book.text_snippet || undefined,
+        };
+
         const resp = await fetch("/api/generate_llm_context", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id_book: book.id_book,
-            title: book.title,
-            page: book.page,
-            text_snippet: book.text_snippet || "",   // ← передаем короткий фрагмент
-          }),
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
           signal: ac.signal,
         });
 
-
-        if (!resp.ok || !resp.body) throw new Error("Bad response");
+        if (!resp.ok || !resp.body) {
+          const errText = await resp.text().catch(() => "");
+          console.error("LLM ctx error", resp.status, errText);
+          throw new Error("Bad response");
+        }
 
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
@@ -292,12 +315,9 @@ export const ChatBox: React.FC = () => {
           const { value, done } = await reader.read();
           if (done) break;
           acc += decoder.decode(value, { stream: true });
-
-          // обновляем кэш «по ходу»
-          setCtxCache((prev) => ({ ...prev, [key]: acc }));
+          setCtxCache((prev) => ({ ...prev, [key]: acc })); // обновляем кэш на лету
         }
 
-        // финальный докод
         acc += new TextDecoder().decode();
         setCtxCache((prev) => ({ ...prev, [key]: acc.trim() }));
       } catch (e: any) {
@@ -308,7 +328,6 @@ export const ChatBox: React.FC = () => {
     })();
   }
 
-  // закрытие модалки — гасим активный стрим
   function closeModal() {
     abortRef.current?.abort();
     setSelectedBook(null);
@@ -328,12 +347,10 @@ export const ChatBox: React.FC = () => {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // лёгкий триггер обновить auth-состояние
   useEffect(() => {
     setIsAuth(isAuthenticated());
   }, [messages.length]);
 
-  // на размонтирование компонента — оборвать стрим
   useEffect(() => {
     return () => abortRef.current?.abort();
   }, []);
@@ -346,10 +363,7 @@ export const ChatBox: React.FC = () => {
         {messages.length === 0 && <IntroCard />}
 
         <div className="w-full max-w-2xl flex flex-col flex-1 border-x border-tau-primary/15 bg-white shadow-sm min-h-0">
-          <div
-            className="flex-1 overflow-y-auto min-h-0 p-3 space-y-4 mb-[56px]"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
+          <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-4 mb-[56px]" style={{ WebkitOverflowScrolling: "touch" }}>
             {messages.map((msg, i) => (
               <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                 {msg.text && (
@@ -374,7 +388,11 @@ export const ChatBox: React.FC = () => {
                     <h4 className="text-xs text-gray-500 mb-1">Релевантные книги (векторный поиск)</h4>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {msg.vector_search.slice(0, visibleVectorCount).map((book, j) => (
-                        <VectorCard key={j} book={book} onClick={() => openVectorBook(book)} />
+                        <VectorCard
+                          key={j}
+                          book={book}
+                          onClick={() => openVectorBook(book, getQueryForAssistantIndex(i))}
+                        />
                       ))}
                     </div>
 
