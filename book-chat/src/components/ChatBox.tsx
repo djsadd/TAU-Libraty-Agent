@@ -204,12 +204,15 @@ const IntroCard: React.FC = () => (
       <div className="flex items-start gap-3">
         <img src={LOGO_URL} alt="TAU Library" className="h-10 w-10 rounded-xl object-contain" />
         <div>
-          <h1 className="text-lg font-semibold text-tau-primary">Найдите нужную книгу или узнайте о библиотеке</h1>
-          <ul className="mt-2 text-sm text-gray-700 space-y-1">
-            <li>• Поиск книг по названию, автору или теме</li>
-            <li>• Информация о библиотеке и её ресурсах</li>
-            <li>• Рекомендации на основе ваших интересов</li>
-          </ul>
+            <h1 className="text-lg font-semibold text-tau-primary">
+              Найдите нужную книгу и узнайте больше о библиотеке
+            </h1>
+            <ul className="mt-2 text-sm text-gray-700 space-y-1">
+              <li>• Ищите книги по названию, автору или тематике</li>
+              <li>• Получайте сведения о фондах и услугах библиотеки</li>
+              <li>• Получайте рекомендации, основанные на ваших интересах</li>
+            </ul>
+
           <p className="mt-3 text-xs text-gray-500">
             Подсказка: попробуйте запрос «сетевые технологии Таненбаум» или «книги по управлению проектами».
           </p>
