@@ -40,8 +40,8 @@ RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
     # && pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-RUN pip install unstructured_inference
-RUN pip install pdf2image
+#RUN pip install unstructured_inference
+#RUN pip install pdf2image
 # Скопируем код проекта
 COPY . .
 

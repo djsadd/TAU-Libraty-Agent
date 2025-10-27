@@ -7,6 +7,8 @@
   html, body, #root {
     height: 100%;
     overflow: hidden;       /* отключаем скролл страницы */
+    background-color: #faf6f8; /* очень светлый оттенок бордового */
+
   }
   body {
     overscroll-behavior: contain; /* мягче на мобилках */

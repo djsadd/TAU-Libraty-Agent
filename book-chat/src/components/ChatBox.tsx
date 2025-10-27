@@ -83,17 +83,36 @@ const BookModal: React.FC<{ book: Book; aiComment?: string; onClose: () => void 
 );
 
 // --- Фиксированный хедер ---
+// --- Фиксированный хедер ---
 const HeaderBar: React.FC = () => (
   <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
-    <div className="mx-auto max-w-2xl flex items-center gap-3 px-4 py-3">
-      <img src={LOGO_URL} alt="TAU Library" className="h-8 w-8 rounded-lg object-contain" />
-      <div className="flex flex-col leading-tight">
-        <span className="text-sm font-semibold text-tau-primary">TAU — Library Assistant</span>
-        <span className="text-xs text-gray-600">Поиск по библиотеке и умные рекомендации</span>
+    <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
+      {/* Логотип и подпись */}
+      <div className="flex items-center gap-3">
+        <img src={LOGO_URL} alt="TAU Library" className="h-8 w-8 rounded-lg object-contain" />
+        <div className="flex flex-col leading-tight">
+          <span className="text-sm font-semibold text-tau-primary">TAU — Library Assistant</span>
+          <span className="text-xs text-gray-600">Поиск по библиотеке и умные рекомендации</span>
+        </div>
+      </div>
+
+      {/* Кнопки справа */}
+      <div className="flex gap-2">
+        <button
+          className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+        >
+          Войти
+        </button>
+        <button
+          className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-tau-primary text-white hover:bg-tau-hover transition"
+        >
+          Регистрация
+        </button>
       </div>
     </div>
   </div>
 );
+
 
 // --- Приветственный блок ---
 const IntroCard: React.FC = () => (

@@ -1,47 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === Базовые стили для всего приложения === */
 html, body, #root {
   height: 100%;
-  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: #fafafa;
+  color: #222;
 }
 
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* === Университетские акценты === */
+.text-tau {
+  color: #630f2c;
+}
+.bg-tau {
+  background-color: #630f2c;
+}
+.bg-tau-hover:hover {
+  background-color: #521025;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+/* === Вспомогательные утилиты === */
+.shadow-tau {
+  box-shadow: 0 4px 8px rgba(99, 15, 44, 0.15);
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.border-tau {
+  border-color: rgba(99, 15, 44, 0.15);
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+/* === Анимация для «ИИ печатает...» === */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
   }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  50% {
+    transform: translateY(-3px);
   }
 }
 
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+.animate-bounce {
+  animation: bounce 0.8s infinite;
 }
