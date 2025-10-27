@@ -15,11 +15,16 @@ from pydantic import BaseModel
 from typing import List, Optional
 from ...deps import get_retriever_dep, get_llm, get_book_retriever_dep
 from app.models.chat import ChatHistory
-router = APIRouter(prefix="/api", tags=["chat", "chat_card"])
 from app.core.db import SessionLocal
 import re
 from fastapi.responses import StreamingResponse
 from app.models.books import Document
+from sentence_transformers import CrossEncoder
+
+
+router = APIRouter(prefix="/api", tags=["chat", "chat_card"])
+reranker = CrossEncoder("BAAI/bge-reranker-v2-m3")
+
 
 def clean_context(text: str) -> str:
     """
@@ -268,6 +273,7 @@ async def chat(req: ChatRequest,
 
     session_id = req.sessionId or "anonymous"
 
+    # --- защита от спама ---
     now = time.time()
     last_time = _last_request_time.get(session_id, 0)
     if now - last_time < RATE_LIMIT_SECONDS:
@@ -294,54 +300,68 @@ async def chat(req: ChatRequest,
             for k in kabis_records
         ]
 
-    vec_docs = retriever.invoke(req.query, config={"k": req.k or 5})
+    # --- ВЕКТОРНЫЙ ПОИСК ---
+    vec_docs = retriever.invoke(req.query, config={"k": req.k or 15})  # чуть больше кандидатов
 
+    # --- РЕРАНКЕР: сортируем vec_docs по смысловой релевантности ---
+    pairs = [(req.query, d.page_content or "") for d in vec_docs]
+    scores = reranker.predict(pairs)
+
+    for d, s in zip(vec_docs, scores):
+        d.metadata["rerank_score"] = float(s)
+
+    # Сортируем по убыванию
+    vec_docs = sorted(vec_docs, key=lambda x: x.metadata.get("rerank_score", 0), reverse=True)
+
+    # --- Собираем карточки ---
     vector_cards_dictionary = {}
-
     for d in vec_docs:
         m = d.metadata or {}
         id_book = m.get("id_book")
-        if id_book in vector_cards_dictionary:
-            text_snippet = (d.page_content or "")[:600].strip()
-            page = m.get("page")
-            vector_cards_dictionary[id_book]['pages'].append(page)
-            vector_cards_dictionary[id_book]['text_snippets'].append(text_snippet)
-        else:
-            text_snippet = (d.page_content or "")[:600].strip()
-            page = m.get("page")
+        text_snippet = (d.page_content or "")[:600].strip()
+        page = m.get("page")
+
+        if id_book not in vector_cards_dictionary:
             vector_cards_dictionary[id_book] = {
-                "pages": [page],
-                "text_snippets": [text_snippet],
+                "pages": [],
+                "text_snippets": [],
             }
 
+        vector_cards_dictionary[id_book]['pages'].append(page)
+        vector_cards_dictionary[id_book]['text_snippets'].append(text_snippet)
+
+    # --- Обогащаем метаданными из БД ---
     id_books = [d.metadata.get("doc_id") for d in vec_docs if d.metadata]
     with SessionLocal() as session:
         documents = session.query(Document).filter(Document.id.in_(id_books)).all()
         for doc in documents:
-            print(doc.source, doc.source == "library")
             if doc.source == 'kabis':
                 record = session.query(Kabis).filter_by(id=doc.id_book).first()
-
-                vector_cards_dictionary[doc.id_book]["title"] = record.title or record.author
-                vector_cards_dictionary[doc.id_book]["language"] = record.lang
-                vector_cards_dictionary[doc.id_book]["pub_info"] = record.pub_info
-                vector_cards_dictionary[doc.id_book]["subjects"] = record.subjects
-                vector_cards_dictionary[doc.id_book]["download_url"] = record.download_url
+                vector_cards_dictionary[doc.id_book].update({
+                    "title": record.title or record.author,
+                    "language": record.lang,
+                    "pub_info": record.pub_info,
+                    "subjects": record.subjects,
+                    "download_url": record.download_url
+                })
             elif doc.source == 'library':
                 record = session.query(Library).filter_by(id=doc.id_book).first()
+                vector_cards_dictionary[doc.id_book].update({
+                    "title": record.title,
+                    "download_url": record.download_url
+                })
 
-                vector_cards_dictionary[doc.id_book]["title"] = record.title
-                vector_cards_dictionary[doc.id_book]["download_url"] = record.download_url
-
+    # --- Асинхронное аннотирование ---
     tasks = [summarize_card(llm, req, card) for card in vector_cards_dictionary.items()]
     annotated_vector_cards = await asyncio.gather(*tasks)
 
+    # --- Логируем ---
     save_chat_history(
         db=db,
         session_id=session_id,
         question=req.query,
         answer="",
-        tools_used=["book_search", "vector_search"]
+        tools_used=["book_search", "vector_search", "reranker"]
     )
 
     return {
