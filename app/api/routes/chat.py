@@ -294,7 +294,6 @@ async def chat(req: ChatRequest,
             for k in kabis_records
         ]
 
-    # --- VECTOR SEARCH ---
     vec_docs = retriever.invoke(req.query, config={"k": req.k or 5})
 
     vector_cards_dictionary = {}
@@ -334,14 +333,9 @@ async def chat(req: ChatRequest,
                 vector_cards_dictionary[doc.id_book]["title"] = record.title
                 vector_cards_dictionary[doc.id_book]["download_url"] = record.download_url
 
-    semaphore = asyncio.Semaphore(3)
 
-    # async def summarize_card_limited(llm, req, card):
-    #     async with semaphore:
-    #         return await summarize_card(llm, req, card)
-    #
-    # tasks = [summarize_card_limited(llm, req, card) for card in vector_cards_dictionary.items()]
-    # annotated_vector_cards = await asyncio.gather(*tasks)
+    tasks = [summarize_card(llm, req, card) for card in vector_cards_dictionary.items()]
+    annotated_vector_cards = await asyncio.gather(*tasks)
 
     save_chat_history(
         db=db,
@@ -354,7 +348,7 @@ async def chat(req: ChatRequest,
     return {
         "reply": "В библиотеке найдены следующие книги: ",
         "book_search": kb_map,
-        "vector_search": vector_cards_dictionary
+        "vector_search": annotated_vector_cards
     }
 
 
