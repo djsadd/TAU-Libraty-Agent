@@ -153,7 +153,7 @@ const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth
       <div className="flex items-center gap-3">
         <img src={LOGO_URL} alt="TAU Library" className="h-8 w-8 rounded-lg object-contain" />
         <div className="flex flex-col leading-tight">
-          <span className="text-sm font-semibold text-tau-primary">TAU — Library Assistant</span>
+          <span className="text-sm font-semibold text-tau-primary">TAU — LibraryBot</span>
           <span className="text-xs text-gray-600">Поиск по библиотеке и умные рекомендации</span>
         </div>
       </div>
