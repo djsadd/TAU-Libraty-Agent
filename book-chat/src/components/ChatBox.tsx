@@ -4,7 +4,17 @@ import { fetchAIResponse } from "../utils/aiClient";
 
 const LOGO_URL = "/images/logorgb.png";
 
-// --- Типы ---
+/* ==========================
+ * Вспомогательное
+ * ========================== */
+// простая проверка авторизации: есть ли токен в localStorage / sessionStorage
+function isAuthenticated() {
+  return !!(localStorage.getItem("token") || sessionStorage.getItem("token"));
+}
+
+/* ==========================
+ * Типы
+ * ========================== */
 interface Book {
   title: string;
   author?: string;
@@ -27,7 +37,9 @@ interface Message {
   book_search?: Book[];
 }
 
-// --- Карточка книги ---
+/* ==========================
+ * UI карточки
+ * ========================== */
 const BookCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onClick }) => (
   <div
     onClick={onClick}
@@ -40,7 +52,6 @@ const BookCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onClick
   </div>
 );
 
-// --- Карточка из векторного поиска ---
 const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onClick }) => (
   <div
     onClick={onClick}
@@ -52,8 +63,14 @@ const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onCli
   </div>
 );
 
-// --- Модалка книги ---
-const BookModal: React.FC<{ book: Book; aiComment?: string; onClose: () => void }> = ({ book, aiComment, onClose }) => (
+/* ==========================
+ * Модалка книги
+ * ========================== */
+const BookModal: React.FC<{ book: Book; aiComment?: string; onClose: () => void }> = ({
+  book,
+  aiComment,
+  onClose,
+}) => (
   <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
     <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative border border-tau-primary/15">
       <button
@@ -69,11 +86,13 @@ const BookModal: React.FC<{ book: Book; aiComment?: string; onClose: () => void 
       {book.year && <p className="text-sm text-gray-600">{book.year}</p>}
       {book.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
 
-      {aiComment && book.summary && (
+      {(aiComment || book.summary) && (
         <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700">
           <div
             dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(book.summary.replace(/\n/g, "<br>")),
+              __html: DOMPurify.sanitize(
+                (book.summary || aiComment || "").replace(/\n/g, "<br>")
+              ),
             }}
           />
         </div>
@@ -82,9 +101,10 @@ const BookModal: React.FC<{ book: Book; aiComment?: string; onClose: () => void 
   </div>
 );
 
-// --- Фиксированный хедер ---
-// --- Фиксированный хедер ---
-const HeaderBar: React.FC = () => (
+/* ==========================
+ * Фиксированный хедер
+ * ========================== */
+const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth, onLogout }) => (
   <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
     <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
       {/* Логотип и подпись */}
@@ -98,23 +118,37 @@ const HeaderBar: React.FC = () => (
 
       {/* Кнопки справа */}
       <div className="flex gap-2">
-        <button
-          className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
-        >
-          Войти
-        </button>
-        <button
-          className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-tau-primary text-white hover:bg-tau-hover transition"
-        >
-          Регистрация
-        </button>
+        {isAuth ? (
+          <button
+            onClick={onLogout}
+            className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+          >
+            Выйти
+          </button>
+        ) : (
+          <>
+            <button
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+              onClick={() => (window.location.href = "/login")}
+            >
+              Войти
+            </button>
+            <button
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-tau-primary text-white hover:bg-tau-hover transition"
+              onClick={() => (window.location.href = "/register")}
+            >
+              Регистрация
+            </button>
+          </>
+        )}
       </div>
     </div>
   </div>
 );
 
-
-// --- Приветственный блок ---
+/* ==========================
+ * Приветственный блок
+ * ========================== */
 const IntroCard: React.FC = () => (
   <div className="px-4 pt-4">
     <div className="mx-auto max-w-2xl bg-gradient-to-b from-tau-primary/10 to-white border border-tau-primary/15 rounded-2xl shadow-sm p-5">
@@ -136,7 +170,9 @@ const IntroCard: React.FC = () => (
   </div>
 );
 
-// --- Основной компонент ---
+/* ==========================
+ * Основной компонент чата
+ * ========================== */
 export const ChatBox: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -146,10 +182,20 @@ export const ChatBox: React.FC = () => {
   const [visibleBookCount, setVisibleBookCount] = useState(6);
   const [visibleVectorCount, setVisibleVectorCount] = useState(6);
 
+  const [isAuth, setIsAuth] = useState(isAuthenticated());
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
   const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    setIsAuth(false);
+    // Если у тебя серверная сессия/куки: дерни /auth/logout и чисти куки
+    // window.location.href = "/login";
+  };
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
@@ -178,24 +224,44 @@ export const ChatBox: React.FC = () => {
     }
   }
 
+  // автоскролл
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isTyping]);
 
+  // реагировать на изменения токена в другой вкладке
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "token") setIsAuth(isAuthenticated());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // лёгкий триггер обновить auth-состояние (можешь заменить на свой)
+  useEffect(() => {
+    setIsAuth(isAuthenticated());
+  }, [messages.length]);
+
   return (
     <div className="fixed inset-0 flex flex-col w-full bg-gray-50 overflow-hidden">
-      <HeaderBar />
+      <HeaderBar isAuth={isAuth} onLogout={handleLogout} />
 
       <div className="flex flex-col flex-1 items-center pt-[72px] overflow-hidden min-h-0">
         {messages.length === 0 && <IntroCard />}
 
         <div className="w-full max-w-2xl flex flex-col flex-1 border-x border-tau-primary/15 bg-white shadow-sm min-h-0">
-          <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-4 mb-[56px]" style={{ WebkitOverflowScrolling: "touch" }}>
+          <div
+            className="flex-1 overflow-y-auto min-h-0 p-3 space-y-4 mb-[56px]"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
             {messages.map((msg, i) => (
               <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                 {msg.text && (
                   <div
-                    className={`rounded-2xl px-4 py-2 max-w-xs ${msg.role === "user" ? "bg-tau-primary text-white" : "bg-gray-100 text-gray-900"}`}
+                    className={`rounded-2xl px-4 py-2 max-w-xs ${
+                      msg.role === "user" ? "bg-tau-primary text-white" : "bg-gray-100 text-gray-900"
+                    }`}
                   >
                     {msg.text}
                   </div>
@@ -219,7 +285,10 @@ export const ChatBox: React.FC = () => {
 
                     {msg.vector_search.length > visibleVectorCount && (
                       <div className="flex justify-center mt-2">
-                        <button className="text-xs px-3 py-1 bg-tau-primary hover:bg-tau-hover text-white rounded-lg transition" onClick={loadMoreVectors}>
+                        <button
+                          className="text-xs px-3 py-1 bg-tau-primary hover:bg-tau-hover text-white rounded-lg transition"
+                          onClick={loadMoreVectors}
+                        >
                           Загрузить ещё
                         </button>
                       </div>
@@ -238,7 +307,10 @@ export const ChatBox: React.FC = () => {
 
                     {msg.book_search.length > visibleBookCount && (
                       <div className="flex justify-center mt-2">
-                        <button className="text-xs px-3 py-1 bg-tau-primary hover:bg-tau-hover text-white rounded-lg transition" onClick={loadMoreBooks}>
+                        <button
+                          className="text-xs px-3 py-1 bg-tau-primary hover:bg-tau-hover text-white rounded-lg transition"
+                          onClick={loadMoreBooks}
+                        >
                           Загрузить ещё
                         </button>
                       </div>
@@ -268,14 +340,23 @@ export const ChatBox: React.FC = () => {
               className="flex-1 border border-tau-primary/15 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-tau-primary/30"
               aria-label="Сообщение"
             />
-            <button type="submit" className="bg-tau-primary hover:bg-tau-hover text-white px-4 py-2 rounded-xl transition">
+            <button
+              type="submit"
+              className="bg-tau-primary hover:bg-tau-hover text-white px-4 py-2 rounded-xl transition"
+            >
               Отправить
             </button>
           </form>
         </div>
       </div>
 
-      {selectedBook && <BookModal book={selectedBook} aiComment={messages[messages.length - 1]?.reply} onClose={() => setSelectedBook(null)} />}
+      {selectedBook && (
+        <BookModal
+          book={selectedBook}
+          aiComment={messages[messages.length - 1]?.reply}
+          onClose={() => setSelectedBook(null)}
+        />
+      )}
     </div>
   );
 };

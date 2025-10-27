@@ -117,12 +117,23 @@ export function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, remember })
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message || "Не удалось войти");
-      }
-      // В идеале: сохранить токен/сессию, затем
-      navigate("/app"); // перенаправьте куда нужно
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.message || "Не удалось войти");
+    }
+
+    // НОВОЕ: читаем json и сохраняем токен
+    const data = await res.json(); // ожидаем { access_token, token_type?, refresh_token? ... }
+    const storage = remember ? localStorage : sessionStorage;
+    if (data?.access_token) {
+      storage.setItem("token", data.access_token);
+      if (data?.token_type) storage.setItem("token_type", data.token_type); // опционально
+      if (data?.refresh_token) storage.setItem("refresh_token", data.refresh_token); // если есть
+    }
+
+    navigate("/app");
+
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -288,12 +299,20 @@ export function RegisterPage() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message || "Не удалось зарегистрироваться");
-      }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.message || "Не удалось зарегистрироваться");
+    }
 
-      navigate("/app");
+    // НОВОЕ: если сервер сразу даёт токен — сохраним
+    const data = await res.json().catch(() => null);
+    if (data?.access_token) {
+      localStorage.setItem("token", data.access_token);
+    }
+
+    navigate("/app");
+
+
     } catch (e: any) {
       setError(e.message);
     } finally {
