@@ -1,6 +1,8 @@
-// ChatBox.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import DOMPurify from "dompurify";
+import { fetchAIResponse } from "../utils/aiClient";
+
+const LOGO_URL = "/images/logorgb.png";
 
 /* ==========================
  * Вспомогательное
@@ -11,180 +13,77 @@ function isAuthenticated() {
 function getAuthToken() {
   return localStorage.getItem("token") || sessionStorage.getItem("token") || "";
 }
-
-/** Универсальный парсер потока:
- * - Oбычный текст: просто накапливаем
- * - NDJSON: каждая строка — JSON; {type:"text", delta:"..."}, {type:"meta", download_url:"..."}
- * - SSE: строки начинаются с "data:"; внутри либо текст, либо JSON
- */
-async function streamApi({
-  url,
-  body,
-  onText,
-  onDownloadUrl,
-  signal,
-}: {
-  url: string;
-  body: unknown;
-  onText: (chunk: string) => void;
-  onDownloadUrl?: (u: string) => void;
-  signal?: AbortSignal;
-}) {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  const token = getAuthToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body ?? {}),
-    signal,
-  });
-
-  if (!resp.ok || !resp.body) {
-    const t = await resp.text().catch(() => "");
-    throw new Error(`Bad response ${resp.status}: ${t}`);
-  }
-
-  const ctype = (resp.headers.get("content-type") || "").toLowerCase();
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-
-  let leftover = ""; // для NDJSON/строк
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-
-    // SSE?
-    if (ctype.includes("text/event-stream")) {
-      // Разбиваем по \n\n (окончание event)
-      const events = (leftover + chunk).split(/\n\n/);
-      leftover = events.pop() || "";
-      for (const evt of events) {
-        // Ищем строки "data: ..."
-        const lines = evt.split(/\n/);
-        for (const ln of lines) {
-          const m = ln.match(/^data:\s*(.*)$/i);
-          if (!m) continue;
-          const data = m[1];
-          try {
-            const j = JSON.parse(data);
-            if (j?.type === "text" && typeof j.delta === "string") onText(j.delta);
-            else if (j?.type === "meta" && typeof j.download_url === "string") onDownloadUrl?.(j.download_url);
-            else if (typeof j === "string") onText(j);
-          } catch {
-            // не JSON — считаем обычным текстом
-            if (data) onText(data);
-          }
-        }
-      }
-      continue;
-    }
-
-    // NDJSON или «просто текст построчно»
-    const combined = leftover + chunk;
-    const lines = combined.split(/\r?\n/);
-    leftover = lines.pop() || "";
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      // Пытаемся как JSON
-      try {
-        const j = JSON.parse(trimmed);
-        if (j?.type === "text" && typeof j.delta === "string") onText(j.delta);
-        else if (j?.type === "meta" && typeof j.download_url === "string") onDownloadUrl?.(j.download_url);
-        else if (typeof j === "string") onText(j);
-        else {
-          // неизвестный объект — игнорируем
-        }
-        continue;
-      } catch {
-        // Не JSON — считаем как кусок обычного текста
-        onText(trimmed + "\n");
-      }
-    }
-  }
-
-  // добиваем остатки как текст (если это не SSE и не NDJSON)
-  if (leftover && !ctype.includes("text/event-stream")) {
-    // Если остаток похож на JSON — попробуем
-    try {
-      const j = JSON.parse(leftover.trim());
-      if (j?.type === "text" && typeof j.delta === "string") onText(j.delta);
-      else if (j?.type === "meta" && typeof j.download_url === "string") onDownloadUrl?.(j.download_url);
-      else if (typeof j === "string") onText(j);
-      else onText(leftover);
-    } catch {
-      onText(leftover);
-    }
-  }
+function normalizePage(p?: string | null) {
+  if (!p) return undefined;
+  const n = Number(p);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 /* ==========================
  * Типы
  * ========================== */
-type Role = "user" | "assistant";
+interface Book {
+  title: string;
+  author?: string;
+  pub_info?: string;
+  year?: string;
+  subjects?: string;
+  lang?: string;
+  id_book?: string;
+  text_snippet?: string;
+  summary?: string;
+  cover?: string;
+  page?: string | null;
+}
 interface Message {
-  role: Role;
-  text?: string;       // введённый пользователем текст
-  streamed?: string;   // накопленный стрим ответа
-  download_url?: string | null; // если бэк прислал мету
+  role: "user" | "assistant";
+  text?: string;
+  reply?: string;
+  vector_search?: Book[];
+  book_search?: Book[];
 }
 
 /* ==========================
- * Модалка с отдельным стримом контекста
+ * UI карточки
+ * ========================== */
+const BookCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onClick }) => (
+  <div
+    onClick={onClick}
+    className="border border-tau-primary/15 rounded-xl p-2 cursor-pointer bg-white hover:bg-tau-primary/5 transition"
+  >
+    <div className="text-sm font-semibold text-tau-primary truncate">{book.title}</div>
+    {book.author && <div className="text-xs text-gray-500 truncate">{book.author}</div>}
+    {book.year && <div className="text-xs text-gray-400">{book.year}</div>}
+    {book.subjects && <div className="text-xs text-gray-400 truncate">{book.subjects}</div>}
+  </div>
+);
+
+const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onClick }) => (
+  <div
+    onClick={onClick}
+    className="border border-tau-primary/15 rounded-xl p-2 cursor-pointer bg-gray-50 hover:bg-tau-primary/5 transition"
+  >
+    <div className="text-sm font-semibold text-tau-primary truncate">{book.title}</div>
+    {book.page && <div className="text-xs text-gray-500">Стр. {book.page}</div>}
+    {book.text_snippet && <div className="text-xs text-gray-500 line-clamp-2">{book.text_snippet}</div>}
+  </div>
+);
+
+/* ==========================
+ * Модалка книги (стрим в тело)
  * ========================== */
 const BookModal: React.FC<{
-  isOpen: boolean;
+  book: Book;
+  aiComment?: string;
+  streamed?: string;
+  loading?: boolean;
   onClose: () => void;
-  // что отправляем на /api/generate_llm_context
-  payload: Record<string, any> | null;
-}> = ({ isOpen, onClose, payload }) => {
-  const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const acRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    if (!isOpen || !payload) return;
-
-    setText("");
-    setDownloadUrl(null);
-    setLoading(true);
-
-    const ac = new AbortController();
-    acRef.current = ac;
-
-    streamApi({
-      url: "/api/generate_llm_context",
-      body: payload,
-      signal: ac.signal,
-      onText: (delta) => setText((prev) => prev + delta),
-      onDownloadUrl: (u) => setDownloadUrl(u),
-    })
-      .catch((e) => console.error("ctx stream error:", e))
-      .finally(() => setLoading(false));
-
-    return () => {
-      ac.abort();
-    };
-  }, [isOpen, payload]);
-
-  const html = useMemo(() => {
-    return DOMPurify.sanitize((text || "").replace(/\n/g, "<br>"));
-  }, [text]);
-
-  if (!isOpen) return null;
+}> = ({ book, aiComment, streamed, loading, onClose }) => {
+  const html = (streamed || book.summary || aiComment || "").replace(/\n/g, "<br>");
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative border border-gray-200">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative border border-tau-primary/15">
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
@@ -193,56 +92,253 @@ const BookModal: React.FC<{
           ✕
         </button>
 
-        <h2 className="text-lg font-semibold text-gray-900">Контекст</h2>
+        <h2 className="text-xl font-semibold text-tau-primary mb-1">{book.title}</h2>
+        {book.author && <p className="text-sm text-gray-600">{book.author}</p>}
+        {book.year && <p className="text-sm text-gray-600">{book.year}</p>}
+        {book.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
 
-        <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-800 min-h-[120px]">
+        <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[96px]">
           {loading && (
-            <div className="flex items-center gap-2 text-blue-600 mb-2">
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" />
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce delay-100" />
-              <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce delay-200" />
-              <span>Генерирую…</span>
+            <div className="flex items-center gap-2 text-tau-primary mb-2">
+              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce" />
+              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-100" />
+              <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce delay-200" />
+              <span>Генерирую контекст…</span>
             </div>
           )}
-          <div dangerouslySetInnerHTML={{ __html: html }} />
-        </div>
 
-        {downloadUrl && (
-          <a
-            href={downloadUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
-          >
-            Скачать файл
-          </a>
-        )}
+          {(streamed || aiComment || book.summary) ? (
+            <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }} />
+          ) : (
+            !loading && <div className="text-gray-500">Нет данных.</div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
 /* ==========================
- * Основной компонент (только стрим + download_url)
+ * Фиксированный хедер
+ * ========================== */
+const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth, onLogout }) => (
+  <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
+    <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
+      <div className="flex items-center gap-3">
+        <img src={LOGO_URL} alt="TAU Library" className="h-8 w-8 rounded-lg object-contain" />
+        <div className="flex flex-col leading-tight">
+          <span className="text-sm font-semibold text-tau-primary">TAU — Library Assistant</span>
+          <span className="text-xs text-gray-600">Поиск по библиотеке и умные рекомендации</span>
+        </div>
+      </div>
+
+      <div className="flex gap-2 items-center">
+        {isAuth ? (
+          <>
+            <button
+              onClick={() => (window.location.href = "/profile")}
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+            >
+              Профиль
+            </button>
+            <button
+              onClick={onLogout}
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-red-500/90 text-white hover:bg-red-600 transition"
+            >
+              Выйти
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+              onClick={() => (window.location.href = "/login")}
+            >
+              Войти
+            </button>
+            <button
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-tau-primary text-white hover:bg-tau-hover transition"
+              onClick={() => (window.location.href = "/register")}
+            >
+              Регистрация
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+/* ==========================
+ * Приветственный блок
+ * ========================== */
+const IntroCard: React.FC = () => (
+  <div className="px-4 pt-4">
+    <div className="mx-auto max-w-2xl bg-gradient-to-b from-tau-primary/10 to-white border border-tau-primary/15 rounded-2xl shadow-sm p-5">
+      <div className="flex items-start gap-3">
+        <img src={LOGO_URL} alt="TAU Library" className="h-10 w-10 rounded-xl object-contain" />
+        <div>
+          <h1 className="text-lg font-semibold text-tau-primary">Найдите нужную книгу или узнайте о библиотеке</h1>
+          <ul className="mt-2 text-sm text-gray-700 space-y-1">
+            <li>• Поиск книг по названию, автору или теме</li>
+            <li>• Информация о библиотеке и её ресурсах</li>
+            <li>• Рекомендации на основе ваших интересов</li>
+          </ul>
+          <p className="mt-3 text-xs text-gray-500">
+            Подсказка: попробуйте запрос «сетевые технологии Таненбаум» или «книги по управлению проектами».
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+/* ==========================
+ * Основной компонент чата
  * ========================== */
 export const ChatBox: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+
+  const [visibleBookCount, setVisibleBookCount] = useState(6);
+  const [visibleVectorCount, setVisibleVectorCount] = useState(6);
+
   const [isAuth, setIsAuth] = useState(isAuthenticated());
 
-  // модалка
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalPayload, setModalPayload] = useState<Record<string, any> | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const endRef = useRef<HTMLDivElement | null>(null);
-  const acRef = useRef<AbortController | null>(null);
+  // ======= lastQuery + кэш + стрим =======
+  const lastQueryRef = useRef<string>("");
+  function ctxKey(b: Book) {
+    return `${b.id_book || b.title || "no-id"}::${b.page || "n/a"}`;
+  }
+  const [ctxCache, setCtxCache] = useState<Record<string, string>>({});
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // авто-скролл
+  const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
+  const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    setIsAuth(false);
+  };
+
+  async function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    const q = input.trim();
+    if (!q) return;
+
+    lastQueryRef.current = q; // запомним последний запрос пользователя
+
+    const userMsg: Message = { role: "user", text: q };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setIsTyping(true);
+
+    try {
+      const res = await fetchAIResponse(q);
+      const aiMsg: Message = {
+        role: "assistant",
+        reply: res.reply,
+        vector_search: res.vector_search,
+        book_search: res.book_search,
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+      setVisibleBookCount(9);
+      setVisibleVectorCount(9);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsTyping(false);
+    }
+  }
+
+  // связанный query для конкретного ассистентского сообщения (индекса i)
+  function getQueryForAssistantIndex(idx: number) {
+    for (let k = idx - 1; k >= 0; k--) {
+      const m = messages[k];
+      if (m.role === "user" && m.text?.trim()) return m.text.trim();
+    }
+    return lastQueryRef.current || "";
+  }
+
+  // ======= Открытие векторной карточки с ленивым стримом =======
+  function openVectorBook(book: Book, q?: string) {
+    setSelectedBook(book);
+
+    const key = ctxKey(book);
+    if (ctxCache[key]) return; // уже сгенерировано — просто покажем
+
+    // прерываем предыдущий стрим, если идёт
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    setLoadingKey(key);
+
+    (async () => {
+      try {
+        const token = getAuthToken();
+        const payload = {
+          id_book: book.id_book || undefined,
+          title: book.title,
+          query: (q && q.trim()) || lastQueryRef.current || book.title, // ← сюда кладём query
+          page: normalizePage(book.page || ""),
+          text_snippet: book.text_snippet || undefined,
+        };
+
+        const resp = await fetch("/api/generate_llm_context", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
+          signal: ac.signal,
+        });
+
+        if (!resp.ok || !resp.body) {
+          const errText = await resp.text().catch(() => "");
+          console.error("LLM ctx error", resp.status, errText);
+          throw new Error("Bad response");
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let acc = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          acc += decoder.decode(value, { stream: true });
+          setCtxCache((prev) => ({ ...prev, [key]: acc })); // обновляем кэш на лету
+        }
+
+        acc += new TextDecoder().decode();
+        setCtxCache((prev) => ({ ...prev, [key]: acc.trim() }));
+      } catch (e: any) {
+        if (e?.name !== "AbortError") console.error(e);
+      } finally {
+        setLoadingKey(null);
+      }
+    })();
+  }
+
+  function closeModal() {
+    abortRef.current?.abort();
+    setSelectedBook(null);
+  }
+
+  // автоскролл
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isTyping]);
 
-  // если токен изменился в других вкладках
+  // реагировать на изменения токена в другой вкладке
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === "token") setIsAuth(isAuthenticated());
@@ -251,173 +347,131 @@ export const ChatBox: React.FC = () => {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Очистка стримов при размонтировании
   useEffect(() => {
-    return () => acRef.current?.abort();
+    setIsAuth(isAuthenticated());
+  }, [messages.length]);
+
+  useEffect(() => {
+    return () => abortRef.current?.abort();
   }, []);
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
-    const q = input.trim();
-    if (!q) return;
-
-    // добавляем сообщение пользователя
-    setMessages((prev) => [...prev, { role: "user", text: q }]);
-    setInput("");
-
-    // добавляем пустую "ассистентскую" болванку и стримим внутрь
-    const idx = messages.length + 1; // позиция будущего ассистентского сообщения
-    setMessages((prev) => [...prev, { role: "assistant", streamed: "", download_url: null }]);
-
-    // обрываем предыдущий стрим, если был
-    acRef.current?.abort();
-    const ac = new AbortController();
-    acRef.current = ac;
-
-    try {
-      await streamApi({
-        url: "/api/chat_stream",
-        body: { query: q },
-        signal: ac.signal,
-        onText: (delta) => {
-          setMessages((prev) => {
-            const copy = [...prev];
-            const m = copy[idx];
-            if (m && m.role === "assistant") {
-              m.streamed = (m.streamed || "") + delta;
-            }
-            return copy;
-          });
-        },
-        onDownloadUrl: (u) => {
-          setMessages((prev) => {
-            const copy = [...prev];
-            const m = copy[idx];
-            if (m && m.role === "assistant") {
-              m.download_url = u;
-            }
-            return copy;
-          });
-        },
-      });
-    } catch (err) {
-      console.error("chat stream error:", err);
-      // помечаем ошибку как текст
-      setMessages((prev) => {
-        const copy = [...prev];
-        const m = copy[idx];
-        if (m && m.role === "assistant") {
-          m.streamed = (m.streamed || "") + "\n[Ошибка при получении ответа]";
-        }
-        return copy;
-      });
-    }
-  }
-
-  // Запуск модалки со стримом контекста.
-  // В payload можно передать всё, что требуется вашему бэку: id_book, title, page, query и т.п.
-  function openModalWithContext(payload: Record<string, any>) {
-    setModalPayload(payload);
-    setIsModalOpen(true);
-  }
-
-  function sanitizeHtml(s?: string) {
-    return DOMPurify.sanitize((s || "").replace(/\n/g, "<br>"));
-  }
-
   return (
-    <div className="fixed inset-0 flex flex-col bg-gray-50">
-      {/* Шапка максимально простая */}
-      <div className="border-b bg-white/95 backdrop-blur px-4 py-3">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="text-sm text-gray-700">
-            <span className="font-semibold">Library Chat</span> — только стрим и download_url
-          </div>
-          <div className="text-xs text-gray-500">{isAuth ? "auth" : "guest"}</div>
-        </div>
-      </div>
+    <div className="fixed inset-0 flex flex-col w-full bg-gray-50 overflow-hidden">
+      <HeaderBar isAuth={isAuth} onLogout={handleLogout} />
 
-      {/* Контент */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto w-full p-3 space-y-4">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`rounded-2xl px-4 py-2 max-w-[85%] ${
-                  m.role === "user" ? "bg-blue-600 text-white" : "bg-white border border-gray-200 text-gray-900"
-                }`}
-              >
-                {m.role === "user" && <div>{m.text}</div>}
-                {m.role === "assistant" && (
-                  <div className="prose prose-sm max-w-none">
-                    <div
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(m.streamed) }}
-                    />
-                    {m.download_url && (
-                      <div className="mt-3">
-                        <a
-                          href={m.download_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition text-xs"
+      <div className="flex flex-col flex-1 items-center pt-[72px] overflow-hidden min-h-0">
+        {messages.length === 0 && <IntroCard />}
+
+        <div className="w-full max-w-2xl flex flex-col flex-1 border-x border-tau-primary/15 bg-white shadow-sm min-h-0">
+          <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-4 mb-[56px]" style={{ WebkitOverflowScrolling: "touch" }}>
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                {msg.text && (
+                  <div
+                    className={`rounded-2xl px-4 py-2 max-w-xs ${
+                      msg.role === "user" ? "bg-tau-primary text-white" : "bg-gray-100 text-gray-900"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                )}
+
+                {msg.reply && (
+                  <div
+                    className="mt-2 prose prose-sm max-w-none bg-gray-50 border border-tau-primary/10 rounded-xl p-3"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.reply.replace(/\n/g, "<br>")) }}
+                  />
+                )}
+
+                {msg.vector_search && msg.vector_search.length > 0 && (
+                  <div className="mt-3 w-full">
+                    <h4 className="text-xs text-gray-500 mb-1">Релевантные книги (векторный поиск)</h4>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {msg.vector_search.slice(0, visibleVectorCount).map((book, j) => (
+                        <VectorCard
+                          key={j}
+                          book={book}
+                          onClick={() => openVectorBook(book, getQueryForAssistantIndex(i))}
+                        />
+                      ))}
+                    </div>
+
+                    {msg.vector_search.length > visibleVectorCount && (
+                      <div className="flex justify-center mt-2">
+                        <button
+                          className="text-xs px-3 py-1 bg-tau-primary hover:bg-tau-hover text-white rounded-lg transition"
+                          onClick={loadMoreVectors}
                         >
-                          Скачать файл
-                        </a>
+                          Загрузить ещё
+                        </button>
                       </div>
                     )}
+                  </div>
+                )}
 
-                    {/* Кнопка для открытия модалки стрима контекста:
-                       передайте сюда нужные поля вашего бэка */}
-                    <div className="mt-2">
-                      <button
-                        onClick={() =>
-                          openModalWithContext({
-                            // пример полезной нагрузки; подстройте под ваш бэк
-                            title: m.text || "context",
-                            // можно прокинуть id_book / page / query
-                            // id_book: "...",
-                            // page: 12,
-                            // query: "..."
-                          })
-                        }
-                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 transition"
-                      >
-                        Открыть контекст (модалка)
-                      </button>
+                {msg.book_search && msg.book_search.length > 0 && (
+                  <div className="mt-3 w-full">
+                    <h4 className="text-xs text-gray-500 mb-1">Найдено в базе книг</h4>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {msg.book_search.slice(0, visibleBookCount).map((book, j) => (
+                        <BookCard key={j} book={book} onClick={() => setSelectedBook(book)} />
+                      ))}
                     </div>
+
+                    {msg.book_search.length > visibleBookCount && (
+                      <div className="flex justify-center mt-2">
+                        <button
+                          className="text-xs px-3 py-1 bg-tau-primary hover:bg-tau-hover text-white rounded-lg transition"
+                          onClick={loadMoreBooks}
+                        >
+                          Загрузить ещё
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            </div>
-          ))}
-          <div ref={endRef} />
+            ))}
+
+            {isTyping && (
+              <div className="flex items-center space-x-2 text-sm text-tau-primary">
+                <div className="w-2 h-2 bg-tau-primary rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-tau-primary rounded-full animate-bounce delay-100" />
+                <div className="w-2 h-2 bg-tau-primary rounded-full animate-bounce delay-200" />
+                <span>ИИ печатает...</span>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form onSubmit={sendMessage} className="border-t border-tau-primary/15 p-3 flex gap-2 bg-gray-50 shrink-0">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Введите запрос к ИИ..."
+              className="flex-1 border border-tau-primary/15 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-tau-primary/30"
+              aria-label="Сообщение"
+            />
+            <button
+              type="submit"
+              className="bg-tau-primary hover:bg-tau-hover text-white px-4 py-2 rounded-xl transition"
+            >
+              Отправить
+            </button>
+          </form>
         </div>
       </div>
 
-      {/* Поле ввода */}
-      <form onSubmit={sendMessage} className="border-t bg-white px-3 py-3">
-        <div className="max-w-2xl mx-auto flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Введите запрос…"
-            className="flex-1 border border-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition"
-          >
-            Отправить
-          </button>
-        </div>
-      </form>
-
-      {/* Модалка со стримом контекста */}
-      <BookModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        payload={modalPayload}
-      />
+      {selectedBook && (
+        <BookModal
+          book={selectedBook}
+          aiComment={messages[messages.length - 1]?.reply}
+          streamed={ctxCache[ctxKey(selectedBook)]}
+          loading={loadingKey === ctxKey(selectedBook)}
+          onClose={closeModal}
+        />
+      )}
     </div>
   );
 };
