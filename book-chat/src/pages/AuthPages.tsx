@@ -112,11 +112,18 @@ export function LoginPage() {
     try {
       setLoading(true);
       // Подключите свой API: /api/auth/login
-      const res = await fetch("/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, remember })
-      });
+      const form = new URLSearchParams();
+        form.set("username", email);
+        form.set("password", password);
+        // не обязательно, но можно:
+        // form.set("grant_type", "password");
+        // form.set("scope", "");
+
+        const res = await fetch("/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: form.toString(),
+        });
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
