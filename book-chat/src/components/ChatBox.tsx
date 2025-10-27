@@ -276,9 +276,11 @@ export const ChatBox: React.FC = () => {
             id_book: book.id_book,
             title: book.title,
             page: book.page,
+            snippet: book.text_snippet || "",   // ← передаем короткий фрагмент
           }),
           signal: ac.signal,
         });
+
 
         if (!resp.ok || !resp.body) throw new Error("Bad response");
 

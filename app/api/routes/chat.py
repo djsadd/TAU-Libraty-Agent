@@ -358,10 +358,16 @@ async def chat(req: ChatRequest,
     }
 
 
+class SnippetRequest(BaseModel):
+    text_snippet: str
+
+
 @router.post("/generate_llm_context")
-def generate_llm_context():
+def generate_llm_context(request: SnippetRequest):
     def text_stream():
-        text = "Данная книга подходит отлично так как..."
-        for chunk in text.split():
+        # пример использования входных данных
+        base_text = "Данная книга подходит отлично так как "
+        result = base_text + f"она связана с темой: {request.snippet}"
+        for chunk in result.split():
             yield chunk + " "
     return StreamingResponse(text_stream(), media_type="text/plain")
