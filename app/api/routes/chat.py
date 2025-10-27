@@ -342,7 +342,7 @@ async def chat(req: ChatRequest,
                     "language": record.lang,
                     "pub_info": record.pub_info,
                     "subjects": record.subjects,
-                    "download_url": record.download_url
+                    "download_url": "kabis.tau-edu.kz" + str(record.download_url)
                 })
             elif doc.source == 'library':
                 record = session.query(Library).filter_by(id=doc.id_book).first()
