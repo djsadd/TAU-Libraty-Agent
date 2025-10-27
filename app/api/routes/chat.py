@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 import re
+from app.core.security import get_current_user
+from app.models.user import User
 import asyncio
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableParallel, RunnablePassthrough
@@ -378,7 +380,7 @@ class LLMContextRequest(BaseModel):
 
 
 @router.post("/generate_llm_context")
-async def generate_llm_context(payload: LLMContextRequest):
+async def generate_llm_context(payload: LLMContextRequest, current_user: User = Depends(get_current_user)):
     system_role = (
         "Ты — академический помощник. Кратко объясни, "
         "почему этот источник может быть полезен студенту по данному вопросу. "
@@ -388,6 +390,7 @@ async def generate_llm_context(payload: LLMContextRequest):
         f"Вопрос: {payload.query}\n\n"
         f"Источник: {payload.title}\n\n"
         f"Фрагмент: {payload.text_snippet}"
+        f"Пользователь: {current_user.full_name}, Специальность пользователя: {current_user.educational_program}"
     )
 
     # Подготовка сообщений под ваш LLM/LC
