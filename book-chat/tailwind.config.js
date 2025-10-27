@@ -4,8 +4,16 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  theme: {
-    extend: {},
+theme: {
+  extend: {
+    colors: {
+      tau: {
+        primary: '#630f2c',
+        hover: '#521025',
+      },
+    },
   },
+},
+
   plugins: [],
 }
