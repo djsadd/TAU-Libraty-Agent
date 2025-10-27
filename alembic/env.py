@@ -15,6 +15,7 @@ import app.models.job
 import app.models.kabis
 from app.models.chat import ChatHistory
 from app.models.libtau import Library
+from app.models.user import User
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

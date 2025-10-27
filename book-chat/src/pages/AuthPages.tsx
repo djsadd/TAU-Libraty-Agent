@@ -138,7 +138,7 @@ export function LoginPage() {
           <LogoHeader title="TAU — Library Assistant" subtitle="Поиск по библиотеке и умные рекомендации" />
           <div className="flex gap-2">
             <Link
-              to="/register"
+              to="/api/register"
               className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
             >
               Регистрация
@@ -309,7 +309,7 @@ export function RegisterPage() {
           <LogoHeader title="TAU — Library Assistant" subtitle="Создайте аккаунт для доступа к сервисам" />
           <div className="flex gap-2">
             <Link
-              to="/login"
+              to="/api/login"
               className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
             >
               Войти
