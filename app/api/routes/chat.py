@@ -367,7 +367,7 @@ def generate_llm_context(request: SnippetRequest):
     def text_stream():
         # пример использования входных данных
         base_text = "Данная книга подходит отлично так как "
-        result = base_text + f"она связана с темой: {request.snippet}"
+        result = base_text + f"она связана с темой: {request.text_snippet}"
         for chunk in result.split():
             yield chunk + " "
     return StreamingResponse(text_stream(), media_type="text/plain")
