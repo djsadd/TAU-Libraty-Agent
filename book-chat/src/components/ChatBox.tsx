@@ -13,6 +13,11 @@ function isAuthenticated() {
 function getAuthToken() {
   return localStorage.getItem("token") || sessionStorage.getItem("token") || "";
 }
+function normalizePage(p?: string | null) {
+  if (!p) return undefined;
+  const n = Number(p);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 /* ==========================
  * Типы
@@ -29,9 +34,6 @@ interface Book {
   summary?: string;
   cover?: string;
   page?: string | null;
-
-  // важное поле-источник для векторной карточки
-  download_url?: string;
 }
 interface Message {
   role: "user" | "assistant";
@@ -56,16 +58,14 @@ const BookCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onClick
   </div>
 );
 
-/** Минималистичная векторная карточка: только download_url */
 const VectorCard: React.FC<{ book: Book; onClick: () => void }> = ({ book, onClick }) => (
   <div
     onClick={onClick}
     className="border border-tau-primary/15 rounded-xl p-2 cursor-pointer bg-gray-50 hover:bg-tau-primary/5 transition"
-    title={book.download_url || ""}
   >
-    <div className="text-xs text-gray-700 break-all line-clamp-2">
-      {book.download_url || "Источник не указан"}
-    </div>
+    <div className="text-sm font-semibold text-tau-primary truncate">{book.title}</div>
+    {book.page && <div className="text-xs text-gray-500">Стр. {book.page}</div>}
+    {book.text_snippet && <div className="text-xs text-gray-500 line-clamp-2">{book.text_snippet}</div>}
   </div>
 );
 
@@ -92,28 +92,10 @@ const BookModal: React.FC<{
           ✕
         </button>
 
-        {/* Шапка для источника: только ссылка (если есть) */}
-        <h2 className="text-sm font-semibold text-tau-primary mb-2">Источник контекста</h2>
-        {book.download_url && (
-          <a
-            href={book.download_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-600 underline break-all"
-          >
-            {book.download_url}
-          </a>
-        )}
-
-        {/* Для обычных book_search можно при желании оставить метаданные */}
-        {!book.download_url && (
-          <>
-            <h3 className="text-lg font-semibold text-tau-primary mt-1">{book.title}</h3>
-            {book.author && <p className="text-sm text-gray-600">{book.author}</p>}
-            {book.year && <p className="text-sm text-gray-600">{book.year}</p>}
-            {book.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
-          </>
-        )}
+        <h2 className="text-xl font-semibold text-tau-primary mb-1">{book.title}</h2>
+        {book.author && <p className="text-sm text-gray-600">{book.author}</p>}
+        {book.year && <p className="text-sm text-gray-600">{book.year}</p>}
+        {book.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
 
         <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[96px]">
           {loading && (
@@ -230,7 +212,7 @@ export const ChatBox: React.FC = () => {
   // ======= lastQuery + кэш + стрим =======
   const lastQueryRef = useRef<string>("");
   function ctxKey(b: Book) {
-    return b.download_url || b.id_book || b.title || "no-id";
+    return `${b.id_book || b.title || "no-id"}::${b.page || "n/a"}`;
   }
   const [ctxCache, setCtxCache] = useState<Record<string, string>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
@@ -302,8 +284,11 @@ export const ChatBox: React.FC = () => {
       try {
         const token = getAuthToken();
         const payload = {
-          download_url: book.download_url, // только URL источника
-          query: (q && q.trim()) || lastQueryRef.current || book.title, // связка с последним запросом
+          id_book: book.id_book || undefined,
+          title: book.title,
+          query: (q && q.trim()) || lastQueryRef.current || book.title, // ← сюда кладём query
+          page: normalizePage(book.page || ""),
+          text_snippet: book.text_snippet || undefined,
         };
 
         const resp = await fetch("/api/generate_llm_context", {
@@ -400,7 +385,7 @@ export const ChatBox: React.FC = () => {
 
                 {msg.vector_search && msg.vector_search.length > 0 && (
                   <div className="mt-3 w-full">
-                    <h4 className="text-xs text-gray-500 mb-1">Релевантные фрагменты (векторный поиск)</h4>
+                    <h4 className="text-xs text-gray-500 mb-1">Релевантные книги (векторный поиск)</h4>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {msg.vector_search.slice(0, visibleVectorCount).map((book, j) => (
                         <VectorCard
