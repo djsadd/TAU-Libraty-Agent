@@ -358,16 +358,39 @@ async def chat(req: ChatRequest,
     }
 
 
-class SnippetRequest(BaseModel):
+class LLMContextRequest(BaseModel):
     text_snippet: str
+    title: str
+    query: str
 
 
 @router.post("/generate_llm_context")
-def generate_llm_context(request: SnippetRequest):
-    def text_stream():
-        # пример использования входных данных
-        base_text = "Данная книга подходит отлично так как "
-        result = base_text + f"она связана с темой: {request.text_snippet}"
-        for chunk in result.split():
+async def generate_llm_context(request: LLMContextRequest):
+    async def text_stream():
+        system_role = (
+            "Ты — академический помощник. Кратко объясни, "
+            "почему этот источник может быть полезен студенту по данному вопросу. "
+            "Ответ давай в формате: стр. X - объяснение. По всем страницам переданные тебе."
+        )
+        human_msg = (
+            f"Вопрос: {request.query}\n\n"
+            f"Источник: {request.title}\n\n"
+            f"Фрагмент: {request.text_snippet}"
+        )
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_role),
+            ("human", human_msg)
+        ])
+
+        llm = get_llm()
+
+        response = await llm.ainvoke(prompt.format_messages())
+
+        result_text = getattr(response, "content", str(response))
+
+        for chunk in result_text.split():
             yield chunk + " "
+            await asyncio.sleep(0.05)
+
     return StreamingResponse(text_stream(), media_type="text/plain")
