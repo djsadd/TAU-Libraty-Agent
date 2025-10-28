@@ -163,7 +163,7 @@ export function LoginPage() {
       </div>
 
       {/* Контент */}
-      <div className="flex-1 flex items-center justify-center pt-[72px] px-4">
+      <div className="flex-1 flex items-center justify-center pt-[72px] px-4 mb-6">
         <div className="w-full max-w-md bg-white border border-tau-primary/15 rounded-2xl shadow-sm p-6">
           <h1 className="text-lg font-semibold text-tau-primary">Войти в аккаунт</h1>
           <p className="text-xs text-gray-600 mt-1">Используйте корпоративный e‑mail, если он у вас есть</p>
@@ -316,7 +316,8 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+    <div className="min-h-[100dvh] bg-gray-50 flex flex-col overflow-y-auto md:overflow-visible">
+
       {/* Хедер */}
       <div className="sticky top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
         <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
@@ -333,7 +334,7 @@ export function RegisterPage() {
       </div>
 
       {/* Контент */}
-      <div className="flex-1 flex items-center justify-center pt-[72px] px-4">
+      <div className="flex-1 flex items-center justify-center pt-[72px] px-4 mb-6">
         <div className="w-full max-w-md bg-white border border-tau-primary/15 rounded-2xl shadow-sm p-6">
           <h1 className="text-lg font-semibold text-tau-primary">Регистрация</h1>
           <p className="text-xs text-gray-600 mt-1">Доступ к поиску, рекомендациям и сохранённым запросам</p>
