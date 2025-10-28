@@ -1,5 +1,7 @@
 // src/main.tsx или src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ProtectedRoute, PublicOnlyRoute } from "./routes/guards";
+
 import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import { ChatBox } from "./components/ChatBox";
 import { ProfilePage } from "./pages/profile";
@@ -9,11 +11,16 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/profile" element={<ProfilePage />} />
+      {/* Публичные только для НЕавторизованных */}
+      <Route element={<PublicOnlyRoute redirectTo="/app" />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+    </Route>
+    <Route element={<ProtectedRoute redirectTo="/login" />}>
         <Route path="/app" element={<ChatBox />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+    </Route>
+
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
