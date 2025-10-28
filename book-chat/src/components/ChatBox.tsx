@@ -126,7 +126,7 @@ const BookModal: React.FC<{
                 <span>Печатаю…</span>
               </div>
             )}
-            <h2>h2{book?.title}</h2>
+            <h2>h2{book.title}</h2>
             <p>Читать онлайн(тест)</p>
             <div className="p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[120px]">
               {typeof streamed === "string" ? (
