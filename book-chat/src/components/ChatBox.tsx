@@ -173,6 +173,12 @@ const HeaderBar: React.FC<{ isAuth: boolean; onLogout: () => void }> = ({ isAuth
               Профиль
             </button>
             <button
+              onClick={() => (window.location.href = "/recommendations")}
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+            >
+              Рекомендации
+            </button>
+            <button
               onClick={onLogout}
               className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-red-500/90 text-white hover:bg-red-600 transition"
             >
