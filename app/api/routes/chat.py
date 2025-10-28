@@ -243,37 +243,28 @@ async def summarize_card(llm, req, card):
     for i in range(len(value["pages"])):
         context += "стр." + str(value["pages"][i]) + "\n"
         context += "фрагмент" + value["text_snippets"][i] + "\n"
-    # system_role = (
-    #     "Ты — академический помощник. Кратко объясни, "
-    #     "почему этот источник может быть полезен студенту по данному вопросу."
-    #     "Ответ давай в формате: стр. X - объяснение. По всем страницам переданные тебе."
-    # )
-    # human_msg = (
-    #     f"Вопрос: {req.query}\n\n"
-    #     f"Источник: {value['title']}\n\n"
-    #     f"Фрагмент: {context}"
-    # )
-    # prompt = ChatPromptTemplate.from_messages([
-    #     ("system", system_role),
-    #     ("human", human_msg)
-    # ])
-    # response = await llm.ainvoke(prompt.format_messages())  # <-- async вызов
     return {
         'title': value["title"],
         'download_url': value['download_url'],
         "text_snippet": context,
-        # "summary": response.content
             }
 
+from fastapi import Depends
+import asyncio
+import time
+from sqlalchemy.orm import Session
+
+# ... ваши импорты
 
 @router.post("/chat_card", summary="Чат с карточками книг")
-async def chat(req: ChatRequest,
-               retriever=Depends(get_retriever_dep),
-               book_retriever=Depends(get_book_retriever_dep),
-               llm=Depends(get_llm),
-               db: Session = Depends(get_db),
-               current_user: User = Depends(get_current_user)):
-
+async def chat(
+    req: ChatRequest,
+    retriever=Depends(get_retriever_dep),
+    book_retriever=Depends(get_book_retriever_dep),
+    llm=Depends(get_llm),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     session_id = req.sessionId or "anonymous"
 
     # --- защита от спама ---
@@ -286,79 +277,130 @@ async def chat(req: ChatRequest,
         )
     _last_request_time[session_id] = now
 
-    # --- BOOK SEARCH ---
-    book_docs = book_retriever.invoke(req.query, config={"k": 10})
-    id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
-    with SessionLocal() as session:
-        kabis_records = session.query(Kabis).filter(Kabis.id_book.in_(id_books)).all()
-        kb_map = [
-            {
-                "Language": k.lang,
-                "title": f"{k.author} {k.title}",
-                "pub_info": k.pub_info,
-                "year": k.year,
-                "subjects": k.subjects,
-                "source": "book_search"
-            }
-            for k in kabis_records
-        ]
+    k_vec = req.k or 15
 
-    # --- ВЕКТОРНЫЙ ПОИСК ---
-    vec_docs = retriever.invoke(req.query, config={"k": req.k or 15})  # чуть больше кандидатов
+    # --- BOOK SEARCH (async) ---
+    try:
+        book_docs = await book_retriever.ainvoke(req.query, config={"k": 10})
+    except AttributeError:
+        # если .ainvoke нет — унесём sync в threadpool
+        book_docs = await asyncio.to_thread(book_retriever.invoke, req.query, {"k": 10})
 
-    # --- РЕРАНКЕР: сортируем vec_docs по смысловой релевантности ---
-    pairs = [(req.query, d.page_content or "") for d in vec_docs]
-    scores = reranker.predict(pairs)
+    id_books_from_book_search = [d.metadata.get("id_book") for d in book_docs if getattr(d, "metadata", None)]
+
+    # --- Запрос Kabis (sync DB -> threadpool) ---
+    def fetch_kabis_records(ids):
+        with SessionLocal() as session:
+            return session.query(Kabis).filter(Kabis.id_book.in_(ids)).all()
+
+    kabis_records = await asyncio.to_thread(fetch_kabis_records, id_books_from_book_search)
+
+    kb_map = [
+        {
+            "Language": k.lang,
+            "title": f"{k.author} {k.title}".strip(),
+            "pub_info": k.pub_info,
+            "year": k.year,
+            "subjects": k.subjects,
+            "source": "book_search",
+            "id_book": k.id_book,
+            "download_url": (k.download_url or None),
+        }
+        for k in kabis_records
+    ]
+
+    # --- ВЕКТОРНЫЙ ПОИСК (async) ---
+    try:
+        vec_docs = await retriever.ainvoke(req.query, config={"k": k_vec})
+    except AttributeError:
+        vec_docs = await asyncio.to_thread(retriever.invoke, req.query, {"k": k_vec})
+
+    # --- РЕРАНКЕР (sync -> threadpool) ---
+    pairs = [(req.query, (d.page_content or "")) for d in vec_docs]
+    # Вынесем predict в threadpool, чтобы не блокировать event loop
+    scores = await asyncio.to_thread(reranker.predict, pairs)
 
     for d, s in zip(vec_docs, scores):
+        # гарантируем, что metadata есть
+        if not getattr(d, "metadata", None):
+            d.metadata = {}
         d.metadata["rerank_score"] = float(s)
 
-    # Сортируем по убыванию
-    vec_docs = sorted(vec_docs, key=lambda x: x.metadata.get("rerank_score", 0), reverse=True)
+    vec_docs.sort(key=lambda x: x.metadata.get("rerank_score", 0.0), reverse=True)
 
-    # --- Собираем карточки ---
-    vector_cards_dictionary = {}
+    # --- Собираем карточки по id_book (единый ключ!) ---
+    vector_cards_by_book: dict[str, dict] = {}
     for d in vec_docs:
         m = d.metadata or {}
-        id_book = m.get("id_book")
-        text_snippet = (d.page_content or "")[:600].strip()
+        id_book = m.get("id_book")  # единый ключ по всему пайплайну
+        if not id_book:
+            continue
+        text_snippet = (d.page_content or "").strip()[:600]
         page = m.get("page")
 
-        if id_book not in vector_cards_dictionary:
-            vector_cards_dictionary[id_book] = {
-                "pages": [],
-                "text_snippets": [],
-            }
+        bucket = vector_cards_by_book.setdefault(id_book, {"pages": [], "text_snippets": []})
+        bucket["pages"].append(page)
+        bucket["text_snippets"].append(text_snippet)
 
-        vector_cards_dictionary[id_book]['pages'].append(page)
-        vector_cards_dictionary[id_book]['text_snippets'].append(text_snippet)
+    # --- Обогащение метаданными (исправлена путаница с doc_id/id_book) ---
+    # Берём все id_book, что накопили выше
+    all_id_books = list(vector_cards_by_book.keys())
 
-    # --- Обогащаем метаданными из БД ---
-    id_books = [d.metadata.get("doc_id") for d in vec_docs if d.metadata]
-    with SessionLocal() as session:
-        documents = session.query(Document).filter(Document.id.in_(id_books)).all()
-        for doc in documents:
-            if doc.source == 'kabis':
-                record = session.query(Kabis).filter_by(id=doc.id_book).first()
-                vector_cards_dictionary[doc.id_book].update({
-                    "title": record.title or record.author,
-                    "language": record.lang,
-                    "pub_info": record.pub_info,
-                    "subjects": record.subjects,
-                    "download_url": "kabis.tau-edu.kz" + str(record.download_url)
-                })
-            elif doc.source == 'library':
-                record = session.query(Library).filter_by(id=doc.id_book).first()
-                vector_cards_dictionary[doc.id_book].update({
-                    "title": record.title,
-                    "download_url": record.download_url
-                })
+    def fetch_doc_meta(id_books: list[str]):
+        with SessionLocal() as session:
+            # Ищем документы по id_book и source
+            docs = session.query(Document).filter(Document.id_book.in_(id_books)).all()
 
-    # --- Асинхронное аннотирование ---
-    tasks = [summarize_card(llm, req, card) for card in vector_cards_dictionary.items()]
+            # Чтобы не делать по два запроса всякий раз
+            kabis_ids = [d.id_book for d in docs if d.source == "kabis"]
+            lib_ids   = [d.id_book for d in docs if d.source == "library"]
+
+            kabis_map = {}
+            if kabis_ids:
+                for rec in session.query(Kabis).filter(Kabis.id_book.in_(kabis_ids)).all():
+                    kabis_map[rec.id_book] = rec
+
+            lib_map = {}
+            if lib_ids:
+                for rec in session.query(Library).filter(Library.id_book.in_(lib_ids)).all():
+                    lib_map[rec.id_book] = rec
+
+            enriched = {}
+            for d in docs:
+                if d.source == "kabis" and d.id_book in kabis_map:
+                    r = kabis_map[d.id_book]
+                    enriched[d.id_book] = {
+                        "title": (r.title or r.author),
+                        "language": r.lang,
+                        "pub_info": r.pub_info,
+                        "subjects": r.subjects,
+                        "download_url": (str(r.download_url) if r.download_url else None),
+                        "source": "kabis",
+                        "id_book": d.id_book,
+                    }
+                elif d.source == "library" and d.id_book in lib_map:
+                    r = lib_map[d.id_book]
+                    enriched[d.id_book] = {
+                        "title": r.title,
+                        "download_url": (r.download_url or None),
+                        "source": "library",
+                        "id_book": d.id_book,
+                    }
+            return enriched
+
+    enriched_meta = await asyncio.to_thread(fetch_doc_meta, all_id_books)
+
+    # Сливаем enrichment в карточки
+    for id_book, meta in enriched_meta.items():
+        vector_cards_by_book.setdefault(id_book, {})
+        vector_cards_by_book[id_book].update(meta)
+
+    # --- Асинхронное аннотирование карточек (у вас уже async) ---
+    # Предпочтительно передавать чистые dict
+    tasks = [summarize_card(llm, req, {"id_book": bid, **card}) for bid, card in vector_cards_by_book.items()]
     annotated_vector_cards = await asyncio.gather(*tasks)
 
-    # --- Логируем ---
+    # --- Лог ---
     save_chat_history(
         db=db,
         session_id=session_id,
@@ -368,7 +410,7 @@ async def chat(req: ChatRequest,
     )
 
     return {
-        "reply": "В библиотеке найдены следующие книги: ",
+        "reply": "В библиотеке найдены следующие книги:",
         "book_search": kb_map,
         "vector_search": annotated_vector_cards
     }
