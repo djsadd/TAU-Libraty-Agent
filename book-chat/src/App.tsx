@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LoginPage, RegisterPage } from "./pages/AuthPages";
 import { ChatBox } from "./components/ChatBox";
 import { ProfilePage } from "./pages/profile";
-
+import NotFound from "./pages/NotFound";
 
 export default function App() {
   return (
@@ -14,6 +14,7 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/app" element={<ChatBox />} />
         <Route path="*" element={<LoginPage />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );
