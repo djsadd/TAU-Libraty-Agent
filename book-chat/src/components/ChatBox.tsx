@@ -86,23 +86,7 @@ const BookModal: React.FC<{
   const htmlBook = (book?.summary || aiComment || "").replace(/\n/g, "<br>");
   // Важно: используем nullish coalescing, чтобы отличать undefined от пустой строки
   const htmlVector = (streamed ?? "").replace(/\n/g, "<br>");
-  async function openOnline(url?: string) {
-    if (!url) return;
-    try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token") || "";
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      window.open(objUrl, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
-    } catch (e) {
-      console.error(e);
-      alert("Не удалось открыть файл.");
-    }
-  }
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl relative border border-tau-primary/15">
