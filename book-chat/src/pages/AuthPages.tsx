@@ -323,7 +323,7 @@ export function RegisterPage() {
           <LogoHeader title="TAU — LibraryBot" subtitle="Создайте аккаунт для доступа к сервисам" />
           <div className="flex gap-2">
             <Link
-              to="/api/login"
+              to="/login"
               className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
             >
               Войти
