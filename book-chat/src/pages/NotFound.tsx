@@ -27,19 +27,19 @@ const NotFound: React.FC = () => {
 
           <div className="flex gap-2 items-center">
             {isAuth ? (
-              <>
+            <>
+              <Link
+                  to="/app"
+                  className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-tau-primary text-white hover:bg-tau-hover transition"
+                >
+                  Приложение
+                </Link>
                 <button
                   onClick={() => navigate("/profile")}
                   className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
                 >
                   Профиль
                 </button>
-                <Link
-                  to="/app"
-                  className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-tau-primary text-white hover:bg-tau-hover transition"
-                >
-                  Домой
-                </Link>
 
               </>
             ) : (
