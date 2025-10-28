@@ -147,15 +147,17 @@ const BookModal: React.FC<{
 
             {book?.download_url && (
               <p className="mt-2">
-                <button
-                    onClick={() => openOnline(book.download_url || undefined)}
-
+                <a
+                  href={book.download_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-tau-primary hover:underline"
                 >
                   Читать онлайн
-                </button>
+                </a>
               </p>
             )}
+
             <div className="p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[120px]">
               {typeof streamed === "string" ? (
                 <div
