@@ -128,7 +128,7 @@ const BookModal: React.FC<{
             )}
             {book?.title && <h2 className="text-lg font-semibold text-tau-primary mb-2">{book.title}</h2>}
 
-            <p>Читать онлайн(тест)</p>
+            <p>Читать онлайн</p>
             <div className="p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[120px]">
               {typeof streamed === "string" ? (
                 <div
@@ -520,22 +520,21 @@ function openVectorBook(book: Book, q?: string) {
       </div>
 
       {modalMode && (
-  <BookModal
-    variant={modalMode} // NEW
-    book={modalMode === "book" ? selectedBook ?? undefined : undefined}
-    aiComment={modalMode === "book" ? messages[messages.length - 1]?.reply : undefined}
-    streamed={
-      modalMode === "vector" && selectedBook
-        ? ctxCache[ctxKey(selectedBook)]
-        : undefined
-    }
-    loading={modalMode === "vector" && selectedBook
-      ? loadingKey === ctxKey(selectedBook)
-      : false}
-    onClose={closeModal}
-  />
-)}
-
+          <BookModal
+            variant={modalMode} // NEW
+            book={selectedBook ?? undefined}
+            aiComment={modalMode === "book" ? messages[messages.length - 1]?.reply : undefined}
+            streamed={
+              modalMode === "vector" && selectedBook
+                ? ctxCache[ctxKey(selectedBook)]
+                : undefined
+            }
+            loading={modalMode === "vector" && selectedBook
+              ? loadingKey === ctxKey(selectedBook)
+              : false}
+            onClose={closeModal}
+          />
+        )}
     </div>
   );
 };
