@@ -150,7 +150,7 @@ export function LoginPage() {
       {/* Хедер */}
       <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
         <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
-          <LogoHeader title="TAU — Library Assistant" subtitle="Поиск по библиотеке и умные рекомендации" />
+          <LogoHeader title="TAU — LibraryBot" subtitle="Поиск по библиотеке и умные рекомендации" />
           <div className="flex gap-2">
             <Link
               to="/register"
@@ -225,8 +225,7 @@ export function LoginPage() {
               <div className="h-px flex-1 bg-gray-200" /> или <div className="h-px flex-1 bg-gray-200" />
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <button className="border border-tau-primary/15 rounded-xl px-3 py-2 text-xs hover:bg-gray-50">Войти через Google</button>
-              <button className="border border-tau-primary/15 rounded-xl px-3 py-2 text-xs hover:bg-gray-50">Через Microsoft</button>
+              <button className="border border-tau-primary/15 rounded-xl px-3 py-2 text-xs hover:bg-gray-50">Войти через Platonus</button>
             </div>
           </div>
 
