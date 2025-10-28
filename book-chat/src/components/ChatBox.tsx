@@ -128,7 +128,7 @@ const BookModal: React.FC<{
             )}
             {book?.title && <h2 className="text-lg font-semibold text-tau-primary mb-2">{book.title}</h2>}
 
-            <p><a href="{book?.download_url}">Читать онлайн</a></p>
+            <p><a href="{book.download_url}">Читать онлайн</a></p>
             <div className="p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[120px]">
               {typeof streamed === "string" ? (
                 <div
