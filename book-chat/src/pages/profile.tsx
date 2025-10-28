@@ -283,6 +283,12 @@ export function ProfilePage() {
             >
               В приложение
             </Link>
+            <Link
+              to="/recommendations"
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+            >
+              Рекомендации
+            </Link>
             <button
               onClick={onLogout}
               className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-red-300 text-red-600 hover:bg-red-50 transition"
