@@ -110,6 +110,8 @@ export function LoginPage() {
     if (password.length < 6) return setError("Минимум 6 символов в пароле");
 
     try {
+
+
       setLoading(true);
       // Подключите свой API: /api/auth/login
       const form = new URLSearchParams();
@@ -241,6 +243,13 @@ export function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+    const [iin, setIin] = useState("");
+
+    function iinClean(v: string) {
+      return v.replace(/\D/g, "").slice(0, 12);
+    }
+
+
   const [confirm, setConfirm] = useState("");
 
   const [educationalProgram, setEducationalProgram] = useState("");
@@ -272,6 +281,9 @@ export function RegisterPage() {
     if (!university.trim()) return setError("Укажите университет");
 
     try {
+        const iinValue = iinClean(iin);
+        if (!iinValue) return setError("Укажите ИИН");
+        if (iinValue.length !== 12) return setError("ИИН должен состоять из 12 цифр");
       setLoading(true);
 
       // payload под твой бэкенд (user_data.*)
@@ -286,6 +298,7 @@ export function RegisterPage() {
         faculty,
         group_name: groupName,
         phone_number: phoneClean(phoneNumber),
+        iin, // ← новое поле
       };
 
       const res = await fetch("/auth/register", {
@@ -390,6 +403,17 @@ export function RegisterPage() {
                 />
               </div>
             </div>
+                <div>
+                  <FieldLabel htmlFor="iin">ИИН</FieldLabel>
+                  <TextInput
+                    id="iin"
+                    name="iin"
+                    placeholder="Например: 010101300000"
+                    maxLength={12}
+                    value={iin}
+                    onChange={(e) => setIin(e.target.value.replace(/\D/g, ""))}
+                  />
+                </div>
 
             <div>
               <FieldLabel htmlFor="educational_program">Образовательная программа</FieldLabel>
