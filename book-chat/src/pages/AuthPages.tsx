@@ -334,7 +334,7 @@ export function RegisterPage() {
 
       {/* Контент */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
-      <div style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+
         <div className="w-full max-w-md bg-white border border-tau-primary/15 rounded-2xl shadow-sm p-6">
           <h1 className="text-lg font-semibold text-tau-primary">Регистрация</h1>
           <p className="text-xs text-gray-600 mt-1">Доступ к поиску, рекомендациям и сохранённым запросам</p>
@@ -492,7 +492,6 @@ export function RegisterPage() {
             <Link to="/login" className="text-tau-primary hover:underline">Войдите</Link>
           </p>
         </div>
-      </div>
       </div>
     </div>
   );
