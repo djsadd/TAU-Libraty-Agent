@@ -220,14 +220,6 @@ export function LoginPage() {
           </form>
 
           {/* Соц. провайдеры — опционально */}
-          <div className="mt-5">
-            <div className="flex items-center gap-3 text-[11px] text-gray-500">
-              <div className="h-px flex-1 bg-gray-200" /> или <div className="h-px flex-1 bg-gray-200" />
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button className="border border-tau-primary/15 rounded-xl px-3 py-2 text-xs hover:bg-gray-50">Войти через Platonus</button>
-            </div>
-          </div>
 
           <p className="mt-4 text-xs text-gray-600">
             Нет аккаунта? {" "}
