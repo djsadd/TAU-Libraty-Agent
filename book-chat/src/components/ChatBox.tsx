@@ -28,7 +28,7 @@ export const ChatBox: React.FC = () => {
   useEffect(() => {
     if (!isAuth) navigate("/login");
   }, [isAuth]);
-
+}
 /* ==========================
  * Типы
  * ========================== */
