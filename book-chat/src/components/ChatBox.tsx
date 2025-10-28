@@ -118,7 +118,6 @@ const BookModal: React.FC<{
         ) : (
           // === variant === 'vector' — показываем текст сразу, даже если он пока пустой ===
           <div className="mt-1">
-            <p>{book?.title}</p>
             {loading && (
               <div className="flex items-center gap-2 text-tau-primary mb-2">
                 <span className="w-2 h-2 rounded-full bg-tau-primary animate-bounce" />
@@ -127,6 +126,7 @@ const BookModal: React.FC<{
                 <span>Печатаю…</span>
               </div>
             )}
+            <h2>{book?.title}</h2>
             <p>Читать онлайн</p>
             <div className="p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[120px]">
               {typeof streamed === "string" ? (
