@@ -145,7 +145,6 @@ const BookModal: React.FC<{
             )}
             {book?.title && <h2 className="text-lg font-semibold text-tau-primary mb-2">{book.title}</h2>}
 
-            <p>Читать онлайн: {book?.download_url}</p>
             {book?.download_url && (
               <p className="mt-2">
                 <button
