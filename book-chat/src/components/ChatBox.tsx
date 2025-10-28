@@ -105,16 +105,6 @@ const BookModal: React.FC<{
             {book?.year && <p className="text-sm text-gray-600">{book.year}</p>}
             {book?.subjects && <p className="text-sm text-gray-600 mb-2">{book.subjects}</p>}
 
-            <div className="mt-4 p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[96px]">
-              {(book?.summary || aiComment) ? (
-                <div
-                  className="whitespace-pre-wrap leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlBook) }}
-                />
-              ) : (
-                <div className="text-gray-500">Нет данных.</div>
-              )}
-            </div>
           </>
         ) : (
           // === variant === 'vector' — показываем текст сразу, даже если он пока пустой ===
