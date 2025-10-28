@@ -3,13 +3,6 @@ import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
 import { useNavigate } from "react-router-dom";
 
-export const ChatBox: React.FC = () => {
-  const navigate = useNavigate();
-  const [isAuth, setIsAuth] = useState(isAuthenticated());
-
-  useEffect(() => {
-    if (!isAuth) navigate("/login");
-  }, [isAuth]);
 
 
 const LOGO_URL = "/images/logorgb.png";
@@ -28,6 +21,13 @@ function normalizePage(p?: string | null) {
   const n = Number(p);
   return Number.isFinite(n) ? n : undefined;
 }
+export const ChatBox: React.FC = () => {
+  const navigate = useNavigate();
+  const [isAuth, setIsAuth] = useState(isAuthenticated());
+
+  useEffect(() => {
+    if (!isAuth) navigate("/login");
+  }, [isAuth]);
 
 /* ==========================
  * Типы
