@@ -81,9 +81,8 @@ const BookModal: React.FC<{
   streamed?: string;   // набегающий текст
   loading?: boolean;   // идёт ли стрим
   onClose: () => void;
-}> = ({ variant, book, aiComment, streamed, loading, onClose }) => {
+}> = ({ variant, book, streamed, loading, onClose }) => {
   // Для 'book' — статический текст; для 'vector' — стрим
-  const htmlBook = (book?.summary || aiComment || "").replace(/\n/g, "<br>");
   // Важно: используем nullish coalescing, чтобы отличать undefined от пустой строки
   const htmlVector = (streamed ?? "").replace(/\n/g, "<br>");
 
