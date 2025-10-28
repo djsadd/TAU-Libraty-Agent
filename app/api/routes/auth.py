@@ -15,6 +15,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
+    iin: str
     full_name: str | None = None
     educational_program: str | None = None
     language_of_study: str | None = None
@@ -28,13 +29,22 @@ class UserRegister(BaseModel):
 # --- Регистрация ---
 @router.post("/register")
 def register(user_data: UserRegister, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == user_data.email).first()
+    # Проверяем email или ИИН на уникальность
+    existing = db.query(User).filter(
+        (User.email == user_data.email) | (User.iin == user_data.iin)
+    ).first()
+
     if existing:
-        raise HTTPException(status_code=400, detail="User already exists")
+        if existing.email == user_data.email:
+            raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
+        if existing.iin == user_data.iin:
+            raise HTTPException(status_code=400, detail="Пользователь с таким ИИН уже существует")
+    print("Saving user with IIN:", user_data.iin)
 
     new_user = User(
         email=user_data.email,
         hashed_password=get_password_hash(user_data.password),
+        iin=user_data.iin,  # ← сохраняем ИИН
         full_name=user_data.full_name,
         educational_program=user_data.educational_program,
         language_of_study=user_data.language_of_study,
@@ -49,7 +59,12 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    return {"msg": "User created", "email": new_user.email, "role": new_user.role.value}
+    return {
+        "msg": "User created",
+        "email": new_user.email,
+        "iin": new_user.iin,
+        "role": new_user.role.value,
+    }
 
 
 # --- Логин ---

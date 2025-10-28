@@ -271,7 +271,8 @@ async def chat(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
                book_retriever=Depends(get_book_retriever_dep),
                llm=Depends(get_llm),
-               db: Session = Depends(get_db)):
+               db: Session = Depends(get_db),
+               current_user: User = Depends(get_current_user)):
 
     session_id = req.sessionId or "anonymous"
 

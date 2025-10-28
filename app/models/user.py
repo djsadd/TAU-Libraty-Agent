@@ -31,3 +31,5 @@ class User(Base):
     avatar_url = Column(String, nullable=True)                      # Фото профиля (если нужно)
     created_at = Column(DateTime(timezone=True), server_default=func.now())  # Когда создан
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())       # Когда обновлён
+    iin = Column(String(12), unique=True, nullable=True, index=True)
+
