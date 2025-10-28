@@ -26,6 +26,12 @@ export const HeaderBar: React.FC<{
               Профиль
             </button>
             <button
+              onClick={() => (window.location.href = "/app")}
+              className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
+            >
+              В приложение
+            </button>
+            <button
               onClick={() => (window.location.href = "/recommendations")}
               className="text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition"
             >
