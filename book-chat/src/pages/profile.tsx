@@ -275,7 +275,7 @@ export function ProfilePage() {
       {/* Хедер */}
       <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
         <div className="mx-auto max-w-3xl flex items-center justify-between px-4 py-3">
-          <LogoHeader title="TAU — Library Assistant" subtitle="Профиль пользователя" />
+          <LogoHeader title="TAU — LibraryBot" subtitle="Профиль пользователя" />
           <div className="flex gap-2">
             <Link
               to="/app"
