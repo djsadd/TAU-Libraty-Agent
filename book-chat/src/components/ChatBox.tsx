@@ -1,6 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import DOMPurify from "dompurify";
 import { fetchAIResponse } from "../utils/aiClient";
+import { useNavigate } from "react-router-dom";
+
+export const ChatBox: React.FC = () => {
+  const navigate = useNavigate();
+  const [isAuth, setIsAuth] = useState(isAuthenticated());
+
+  useEffect(() => {
+    if (!isAuth) navigate("/login");
+  }, [isAuth]);
+
 
 const LOGO_URL = "/images/logorgb.png";
 
