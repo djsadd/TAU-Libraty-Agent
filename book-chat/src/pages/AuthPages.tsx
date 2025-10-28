@@ -146,7 +146,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Хедер */}
       <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
         <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
@@ -318,7 +318,7 @@ export function RegisterPage() {
   return (
     <div className="fixed inset-0 bg-gray-50 flex flex-col">
       {/* Хедер */}
-      <div className="fixed top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
+      <div className="sticky top-0 w-full border-b border-tau-primary/15 bg-white/95 backdrop-blur z-50">
         <div className="mx-auto max-w-2xl flex items-center justify-between px-4 py-3">
           <LogoHeader title="TAU — LibraryBot" subtitle="Создайте аккаунт для доступа к сервисам" />
           <div className="flex gap-2">
@@ -333,7 +333,8 @@ export function RegisterPage() {
       </div>
 
       {/* Контент */}
-      <div className="flex-1 flex items-center justify-center pt-[72px] px-4">
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="w-full max-w-md bg-white border border-tau-primary/15 rounded-2xl shadow-sm p-6">
           <h1 className="text-lg font-semibold text-tau-primary">Регистрация</h1>
           <p className="text-xs text-gray-600 mt-1">Доступ к поиску, рекомендациям и сохранённым запросам</p>
@@ -491,6 +492,7 @@ export function RegisterPage() {
             <Link to="/login" className="text-tau-primary hover:underline">Войдите</Link>
           </p>
         </div>
+      </div>
       </div>
     </div>
   );
