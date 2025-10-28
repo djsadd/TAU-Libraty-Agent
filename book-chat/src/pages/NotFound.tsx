@@ -35,11 +35,12 @@ const NotFound: React.FC = () => {
                   Профиль
                 </button>
                 <Link
-                  to="/"
+                  to="/app"
                   className="text-xs sm:text-sm px-3 py-1.5 rounded-xl bg-tau-primary text-white hover:bg-tau-hover transition"
                 >
                   Домой
                 </Link>
+
               </>
             ) : (
               <>
@@ -73,23 +74,11 @@ const NotFound: React.FC = () => {
           </p>
 
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-            <button
-              onClick={() => navigate(-1)}
-              className="px-4 py-2 rounded-xl border border-tau-primary/20 text-tau-primary hover:bg-tau-primary/10 transition text-sm"
-            >
-              Назад
-            </button>
             <Link
-              to="/"
+              to="/app"
               className="px-4 py-2 rounded-xl bg-tau-primary hover:bg-tau-hover text-white transition text-sm"
             >
               На главную
-            </Link>
-            <Link
-              to="/"
-              className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 transition text-sm"
-            >
-              Найти книгу
             </Link>
           </div>
 
