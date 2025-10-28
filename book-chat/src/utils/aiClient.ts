@@ -12,6 +12,8 @@ export interface BookCard {
   text_snippet?: string;
   summary?: string;
   cover?: string;
+  // опционально можно добавить:
+  download_url?: string | null;
 }
 
 export interface VectorCard {
@@ -20,7 +22,7 @@ export interface VectorCard {
   id_book?: string;
   page?: string | null;
   text_snippet?: string;
-  download_url: string;
+  download_url?: string | null; // делаем опциональным, чтобы не конфликтовать с остальным кодом
   summary?: string;
 }
 
@@ -32,6 +34,15 @@ export interface AIResponse {
   vector_search: VectorCard[];
 }
 
+// локальная утилита получения токена, чтобы не тянуть лишние импорты
+function getAuthToken(): string {
+  return (
+    localStorage.getItem("token") ||
+    sessionStorage.getItem("token") ||
+    ""
+  );
+}
+
 export async function fetchAIResponse(message: string): Promise<AIResponse> {
   const apiUrl = "/api/chat_card";
   const payload = {
@@ -40,15 +51,21 @@ export async function fetchAIResponse(message: string): Promise<AIResponse> {
     sessionId: "web-client",
   };
 
+  const token = getAuthToken();
+
   try {
     const response = await fetch(apiUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok)
+    if (!response.ok) {
       throw new Error(`Ошибка ${response.status}: ${response.statusText}`);
+    }
 
     const data = await response.json();
 
