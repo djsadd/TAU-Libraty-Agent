@@ -300,7 +300,7 @@ export function RegisterPage() {
         phone_number: phoneClean(phoneNumber),
         iin, // ← новое поле
       };
-
+    console.log("payload", payload);
       const res = await fetch("/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
