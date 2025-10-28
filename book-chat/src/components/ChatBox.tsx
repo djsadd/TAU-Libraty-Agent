@@ -253,11 +253,12 @@ export const ChatBox: React.FC = () => {
   const loadMoreBooks = () => setVisibleBookCount((prev) => prev + 6);
   const loadMoreVectors = () => setVisibleVectorCount((prev) => prev + 6);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    setIsAuth(false);
-  };
+    const handleLogout = () => {
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+      setIsAuth(false);
+      window.location.href = "/login"; // ← редирект после выхода
+    };
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
