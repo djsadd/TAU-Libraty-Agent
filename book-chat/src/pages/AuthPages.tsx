@@ -9,7 +9,7 @@ const LOGO_URL = "/images/logorgb.png";
 function LogoHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="flex items-center gap-3">
-      <img src={LOGO_URL} alt="TAU Library" className="h-8 w-8 rounded-lg object-contain" />
+      <img src={LOGO_URL} alt="LibraryBot" className="h-8 w-8 rounded-lg object-contain" />
       <div className="flex flex-col leading-tight">
         <span className="text-sm font-semibold text-tau-primary">{title}</span>
         {subtitle && <span className="text-xs text-gray-600">{subtitle}</span>}
