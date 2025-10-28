@@ -35,6 +35,7 @@ interface Book {
   summary?: string;
   cover?: string;
   page?: string | null;
+  download_url?: string | null;
 }
 interface Message {
   role: "user" | "assistant";
@@ -128,7 +129,7 @@ const BookModal: React.FC<{
             )}
             {book?.title && <h2 className="text-lg font-semibold text-tau-primary mb-2">{book.title}</h2>}
 
-            <p>Читать онлайн: {book.download_url}</p>
+            <p>Читать онлайн: {book?.download_url}</p>
             <div className="p-3 bg-gray-50 border border-tau-primary/10 rounded-lg text-sm text-gray-700 min-h-[120px]">
               {typeof streamed === "string" ? (
                 <div
