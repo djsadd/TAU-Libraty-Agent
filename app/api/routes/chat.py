@@ -26,7 +26,7 @@ from sentence_transformers import CrossEncoder
 
 
 router = APIRouter(prefix="/api", tags=["chat", "chat_card", "educational_discipline_list"])
-reranker = CrossEncoder("BAAI/bge-reranker-v2-m3")
+reranker = CrossEncoder("BAAI/bge-reranker-v2-m3", device="cuda")
 
 
 di_iin = {
