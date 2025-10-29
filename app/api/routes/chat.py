@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 import re
+from sqlalchemy import text
 
 from app.core.security import get_current_user
 from app.models.user import User
@@ -14,6 +15,10 @@ from app.models.kabis import Kabis
 from app.models.libtau import Library
 import time
 from fastapi import HTTPException
+from app.core.config import settings
+from sshtunnel import SSHTunnelForwarder
+import mysql.connector
+
 from pydantic import BaseModel
 from typing import List, Optional
 from ...deps import get_retriever_dep, get_llm, get_book_retriever_dep
@@ -374,6 +379,7 @@ async def chat(req: ChatRequest,
 async def educational_program_list(
     current_user: User = Depends(get_current_user)
 ):
+    print(get_disciplines_from_platonus(current_user.iin))
     return {
         "educational_disciplines": di_iin[current_user.iin]
     }
@@ -521,3 +527,61 @@ async def generate_llm_context(payload: LLMContextRequest, current_user: User = 
         "Connection": "keep-alive",
     }
     return StreamingResponse(gen(), media_type="text/plain; charset=utf-8", headers=headers)
+
+
+@router.get("/students/{iin}/disciplines")
+def get_disciplines_from_platonus(iin: str, db: Session = Depends(get_db)):
+    ssh_host = settings.SSH_SERVER_PLATONUS_HOST
+    ssh_port = settings.SSH_SERVER_PLATONUS_PORT
+    ssh_user = settings.SSH_SERVER_PLATONUS_USER
+    ssh_password = settings.SSH_SERVER_PLATONUS_PASSWORD
+
+    db_host = settings.PLATONUS_DB_HOST
+    db_port = settings.PLATONUS_DB_PORT
+    db_user = settings.PLATONUS_DB_USER
+    db_password = settings.PLATONUS_DB_PASSWORD
+    db_name = settings.PLATONUS_DB_NAME
+    with SSHTunnelForwarder(
+            (ssh_host, ssh_port),
+            ssh_username=ssh_user,
+            ssh_password=ssh_password,
+            remote_bind_address=(db_host, db_port)
+    ) as tunnel:
+        print(f"SSH-туннель запущен на порту {tunnel.local_bind_port}")
+
+        # --- подключаемся к MySQL через туннель ---
+        conn = mysql.connector.connect(
+            host=db_host,
+            port=tunnel.local_bind_port,
+            user=db_user,
+            password=db_password,
+            database=db_name
+        )
+
+        cursor = conn.cursor()
+        cursor.execute("SELECT DATABASE(), VERSION();")
+        print("Текущая база и версия:", cursor.fetchone())
+
+        cursor.close()
+        conn.close()
+
+    query = text(
+        """
+        SELECT 
+            CONCAT(students.lastname, ' ', students.firstname, ' ', students.patronymic) AS fio,
+            subjects.SubjectNameRU AS discipline
+        FROM journal j
+        JOIN students ON j.StudentID = students.StudentID
+        JOIN studygroups ON j.StudyGroupID = studygroups.StudyGroupID
+        JOIN subjects ON subjects.SubjectID = studygroups.subjectid
+        WHERE j.markTypeID IN (2, 3, 4)
+          AND year = :year
+          AND students.iinplt = :iin
+    """
+                 )
+    result = db.execute(query, {"year": 2025, "iin": iin}).fetchall()
+
+    return [
+        {"ФИО обучающегося": row.fio, "Дисциплина": row.discipline}
+        for row in result
+    ]
