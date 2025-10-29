@@ -448,7 +448,7 @@ async def process_row(row, req, retriever, book_retriever, llm):
     }
 
 
-@router.post("/chat_card_recommendations", summary="Чат с карточками книг")
+@router.get("/chat_card_recommendations", summary="Рекомендации книг")
 async def chat_card_recommendations(req: ChatRequest,
                retriever=Depends(get_retriever_dep),
                book_retriever=Depends(get_book_retriever_dep),
