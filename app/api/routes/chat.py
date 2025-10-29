@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 import re
+
 from app.core.security import get_current_user
 from app.models.user import User
 import asyncio
@@ -26,6 +27,17 @@ from sentence_transformers import CrossEncoder
 
 router = APIRouter(prefix="/api", tags=["chat", "chat_card"])
 reranker = CrossEncoder("BAAI/bge-reranker-v2-m3")
+
+
+di_iin = {
+    "021205551147": ["Криптографические методы защиты информации",
+                     "Менеджмент",
+                     "История Казахстана",
+                     "Философия",
+                     "Система управления базами данных",
+                     "Компьютерные сети",
+                     ]
+}
 
 
 def clean_context(text: str) -> str:
@@ -356,6 +368,103 @@ async def chat(req: ChatRequest,
         "book_search": kb_map,
         "vector_search": annotated_vector_cards
     }
+
+
+async def process_row(row, req, retriever, book_retriever, llm):
+    # book search
+    book_docs = book_retriever.invoke(row, config={"k": 10})
+    id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
+
+    # --- синхронный блок с базой данных ---
+    def fetch_kabis():
+        with SessionLocal() as session:
+            kabis_records = session.query(Kabis).filter(Kabis.id_book.in_(id_books)).all()
+            return [
+                {
+                    "Language": k.lang,
+                    "title": f"{k.author} {k.title}",
+                    "pub_info": k.pub_info,
+                    "year": k.year,
+                    "subjects": k.subjects,
+                    "source": "book_search"
+                }
+                for k in kabis_records
+            ]
+    kb_map = await asyncio.to_thread(fetch_kabis)
+
+    # --- vector retrieval + rerank ---
+    vec_docs = retriever.invoke(row, config={"k": req.k or 15})
+    pairs = [(req.query, d.page_content or "") for d in vec_docs]
+    scores = await asyncio.to_thread(reranker.predict, pairs)
+
+    for d, s in zip(vec_docs, scores):
+        d.metadata["rerank_score"] = float(s)
+
+    vec_docs = sorted(vec_docs, key=lambda x: x.metadata.get("rerank_score", 0), reverse=True)
+
+    # --- формируем карточки ---
+    vector_cards_dictionary = {}
+    for d in vec_docs:
+        m = d.metadata or {}
+        id_book = m.get("id_book")
+        text_snippet = (d.page_content or "")[:600].strip()
+        page = m.get("page")
+        if id_book not in vector_cards_dictionary:
+            vector_cards_dictionary[id_book] = {"pages": [], "text_snippets": []}
+        vector_cards_dictionary[id_book]["pages"].append(page)
+        vector_cards_dictionary[id_book]["text_snippets"].append(text_snippet)
+
+    # --- enrichment из базы ---
+    def enrich_from_db():
+        id_books_local = [d.metadata.get("doc_id") for d in vec_docs if d.metadata]
+        with SessionLocal() as session:
+            documents = session.query(Document).filter(Document.id.in_(id_books_local)).all()
+            for doc in documents:
+                if doc.source == 'kabis':
+                    record = session.query(Kabis).filter_by(id=doc.id_book).first()
+                    vector_cards_dictionary[doc.id_book].update({
+                        "title": record.title or record.author,
+                        "language": record.lang,
+                        "pub_info": record.pub_info,
+                        "subjects": record.subjects,
+                        "download_url": "kabis.tau-edu.kz" + str(record.download_url)
+                    })
+                elif doc.source == 'library':
+                    record = session.query(Library).filter_by(id=doc.id_book).first()
+                    vector_cards_dictionary[doc.id_book].update({
+                        "title": record.title,
+                        "download_url": record.download_url
+                    })
+    await asyncio.to_thread(enrich_from_db)
+
+    # --- summarize ---
+    tasks = [summarize_card(llm, req, card) for card in vector_cards_dictionary.items()]
+    annotated_vector_cards = await asyncio.gather(*tasks)
+
+    return {
+        "reply": "В библиотеке найдены следующие книги: ",
+        "book_search": kb_map,
+        "vector_search": annotated_vector_cards
+    }
+
+
+@router.post("/chat_card_recommendations", summary="Чат с карточками книг")
+async def chat_card_recommendations(req: ChatRequest,
+               retriever=Depends(get_retriever_dep),
+               book_retriever=Depends(get_book_retriever_dep),
+               llm=Depends(get_llm),
+               db: Session = Depends(get_db),
+               current_user: User = Depends(get_current_user)):
+
+    session_id = req.sessionId or "anonymous"
+    user_iin = current_user.iin
+    rows = di_iin[user_iin]
+
+    tasks = [process_row(row, req, retriever, book_retriever, llm) for row in rows]
+    results = await asyncio.gather(*tasks)
+
+    cards = {row: result for row, result in zip(rows, results)}
+    return cards
 
 
 class LLMContextRequest(BaseModel):
