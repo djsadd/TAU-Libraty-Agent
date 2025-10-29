@@ -1,4 +1,4 @@
-version: "3"
+version: "3.8"  # лучше 3.8 — поддерживает device reservations
 
 services:
   # ---------- FastAPI ----------
@@ -19,7 +19,14 @@ services:
       --port 8000
       --reload
     volumes:
-      - ./uploads:/app/uploads   # <-- общий том с локальной папкой uploads
+      - ./uploads:/app/uploads   # общий том
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all          # можно ограничить, например: 1
+              capabilities: [gpu]
 
   dramatiq_scheduler:
     build: .
@@ -31,7 +38,7 @@ services:
       - redis
       - db
     volumes:
-      - ./uploads:/app/uploads   # <-- добавлено, чтобы тоже видел файлы
+      - ./uploads:/app/uploads
 
   dramatiq_worker:
     build: .
@@ -43,13 +50,12 @@ services:
       - redis
       - db
     volumes:
-      - ./uploads:/app/uploads   # <-- общий volume для worker
+      - ./uploads:/app/uploads
 
   frontend:
     build:
       context: ./book-chat
       dockerfile: Dockerfile.frontend
-
     container_name: tau-frontend
     ports:
       - "80:80"
