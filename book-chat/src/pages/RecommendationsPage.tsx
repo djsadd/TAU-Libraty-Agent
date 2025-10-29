@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { HeaderBar } from "../components/HeaderBar";
-import { fetchAIResponse } from "../utils/aiClient";
+import { fetchChatCardRecommendations } from "../utils/aiClientRecommendations";
 
 const LOGO_URL = "/images/logorgb.png";
 
@@ -119,7 +119,7 @@ const RecommendationsPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const res: unknown = await fetchAIResponse("Рекомендации по темам");
+        const res: unknown = await fetchChatCardRecommendations();
         console.log("Ответ от бэкенда:", res);
         if (res && typeof res === "object" && !Array.isArray(res)) {
           setData(res as RecommendationsResponse);
