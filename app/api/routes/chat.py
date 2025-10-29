@@ -25,7 +25,7 @@ from app.models.books import Document
 from sentence_transformers import CrossEncoder
 
 
-router = APIRouter(prefix="/api", tags=["chat", "chat_card", "chat_card_recommendations"])
+router = APIRouter(prefix="/api", tags=["chat", "chat_card", "educational_discipline_list"])
 reranker = CrossEncoder("BAAI/bge-reranker-v2-m3")
 
 
@@ -367,6 +367,15 @@ async def chat(req: ChatRequest,
         "reply": "В библиотеке найдены следующие книги: ",
         "book_search": kb_map,
         "vector_search": annotated_vector_cards
+    }
+
+
+@router.get("/educational_discipline_list")
+async def educational_program_list(
+    current_user: User = Depends(get_current_user)
+):
+    return {
+        "educational_disciplines": di_iin[current_user.iin]
     }
 
 
