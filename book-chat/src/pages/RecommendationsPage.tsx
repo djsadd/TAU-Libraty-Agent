@@ -64,6 +64,9 @@ const VectorCard: React.FC<{ book: ChatCardBook }> = ({ book }) => (
 /* ==========================
  * Модалка результатов
  * ========================== */
+/* ==========================
+ * Модалка результатов (скролл внутри)
+ * ========================== */
 const ResultsModal: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -72,6 +75,24 @@ const ResultsModal: React.FC<{
   error: string | null;
   data: ChatCardResponse | null;
 }> = ({ open, onClose, discipline, loading, error, data }) => {
+  // Закрытие по Esc + блокируем скролл фона, пока модалка открыта
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const v = data?.vector_search ?? [];
@@ -79,64 +100,86 @@ const ResultsModal: React.FC<{
   const empty = !loading && !error && v.length === 0 && b.length === 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-label={discipline || "Результаты"}
+    >
       {/* backdrop */}
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      {/* panel */}
-      <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <img src={LOGO_URL} alt="TAU Library" className="h-7 w-7 rounded-md object-contain" />
-            <h2 className="text-lg md:text-xl font-semibold text-tau-primary">
-              {discipline || "Результаты"}
-            </h2>
+
+      {/* panel: ограничиваем высоту и включаем внутренний скролл */}
+      <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-xl border border-gray-200
+                      max-h-[85vh] overflow-y-auto">
+        {/* sticky header — всегда виден при прокрутке */}
+        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-200">
+          <div className="flex items-center justify-between px-4 md:px-6 py-3">
+            <div className="flex items-center gap-3">
+              <img src={LOGO_URL} alt="TAU Library" className="h-7 w-7 rounded-md object-contain" />
+              <h2 className="text-lg md:text-xl font-semibold text-tau-primary">
+                {discipline || "Результаты"}
+              </h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs rounded-md border border-gray-300 hover:bg-gray-100"
+            >
+              Закрыть
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs rounded-md border border-gray-300 hover:bg-gray-100"
-          >
-            Закрыть
-          </button>
         </div>
 
-        {loading && <div className="text-center text-gray-500 py-8">Загрузка карточек…</div>}
-        {error && <div className="text-center text-red-600 py-4">{error}</div>}
+        {/* content */}
+        <div className="px-4 md:px-6 py-4">
+          {loading && <div className="text-center text-gray-500 py-8">Загрузка карточек…</div>}
+          {error && <div className="text-center text-red-600 py-4">{error}</div>}
 
-        {!loading && !error && data?.reply && (
-          <p className="text-sm text-gray-600 mb-4">{data.reply}</p>
-        )}
+          {!loading && !error && data?.reply && (
+            <p className="text-sm text-gray-600 mb-4">{data.reply}</p>
+          )}
 
-        {!loading && !error && (
-          <>
-            {empty && <div className="text-center text-gray-500 py-8">Нет карточек по этой дисциплине.</div>}
-
-            {v.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-tau-primary mb-3">Векторные рекомендации</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {v.slice(0, 24).map((book, i) => (
-                    <VectorCard key={`v-${i}`} book={book} />
-                  ))}
+          {!loading && !error && (
+            <>
+              {empty && (
+                <div className="text-center text-gray-500 py-8">
+                  Нет карточек по этой дисциплине.
                 </div>
-              </div>
-            )}
+              )}
 
-            {b.length > 0 && (
-              <div>
-                <h3 className="text-base font-semibold text-tau-primary mb-3">Обзорные рекомендации</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {b.slice(0, 24).map((book, i) => (
-                    <BookCard key={`b-${i}`} book={book} />
-                  ))}
+              {v.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-base font-semibold text-tau-primary mb-3">
+                    Векторные рекомендации
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {v.slice(0, 24).map((book, i) => (
+                      <VectorCard key={`v-${i}`} book={book} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
-        )}
+              )}
+
+              {b.length > 0 && (
+                <div>
+                  <h3 className="text-base font-semibold text-tau-primary mb-3">
+                    Обзорные рекомендации
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {b.slice(0, 24).map((book, i) => (
+                      <BookCard key={`b-${i}`} book={book} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 };
+
 
 /* ==========================
  * Страница
