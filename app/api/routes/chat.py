@@ -371,7 +371,7 @@ async def chat(req: ChatRequest,
 
 
 async def process_row(row, retriever, book_retriever, llm):
-    # book search
+    # --- book search ---
     book_docs = book_retriever.invoke(row, config={"k": 5})
     id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
 
@@ -390,17 +390,11 @@ async def process_row(row, retriever, book_retriever, llm):
                 }
                 for k in kabis_records
             ]
+
     kb_map = await asyncio.to_thread(fetch_kabis)
 
-    # --- vector retrieval + rerank ---
+    # --- vector retrieval (без reranker) ---
     vec_docs = retriever.invoke(row, config={"k": 5})
-    pairs = [(row, d.page_content or "") for d in vec_docs]
-    scores = await asyncio.to_thread(reranker.predict, pairs)
-
-    for d, s in zip(vec_docs, scores):
-        d.metadata["rerank_score"] = float(s)
-
-    vec_docs = sorted(vec_docs, key=lambda x: x.metadata.get("rerank_score", 0), reverse=True)
 
     vector_cards_dictionary = {}
     for d in vec_docs:
@@ -413,6 +407,7 @@ async def process_row(row, retriever, book_retriever, llm):
         vector_cards_dictionary[id_book]["pages"].append(page)
         vector_cards_dictionary[id_book]["text_snippets"].append(text_snippet)
 
+    # --- enrich metadata from DB ---
     def enrich_from_db():
         id_books_local = [d.metadata.get("doc_id") for d in vec_docs if d.metadata]
         with SessionLocal() as session:
@@ -420,19 +415,22 @@ async def process_row(row, retriever, book_retriever, llm):
             for doc in documents:
                 if doc.source == 'kabis':
                     record = session.query(Kabis).filter_by(id=doc.id_book).first()
-                    vector_cards_dictionary[doc.id_book].update({
-                        "title": record.title or record.author,
-                        "language": record.lang,
-                        "pub_info": record.pub_info,
-                        "subjects": record.subjects,
-                        "download_url": "kabis.tau-edu.kz" + str(record.download_url)
-                    })
+                    if record:
+                        vector_cards_dictionary[doc.id_book].update({
+                            "title": record.title or record.author,
+                            "language": record.lang,
+                            "pub_info": record.pub_info,
+                            "subjects": record.subjects,
+                            "download_url": "kabis.tau-edu.kz" + str(record.download_url)
+                        })
                 elif doc.source == 'library':
                     record = session.query(Library).filter_by(id=doc.id_book).first()
-                    vector_cards_dictionary[doc.id_book].update({
-                        "title": record.title,
-                        "download_url": record.download_url
-                    })
+                    if record:
+                        vector_cards_dictionary[doc.id_book].update({
+                            "title": record.title,
+                            "download_url": record.download_url
+                        })
+
     await asyncio.to_thread(enrich_from_db)
 
     # --- summarize ---
