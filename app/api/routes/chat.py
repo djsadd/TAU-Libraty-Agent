@@ -283,7 +283,7 @@ async def chat(req: ChatRequest,
     _last_request_time[session_id] = now
 
     # --- BOOK SEARCH ---
-    book_docs = book_retriever.invoke(req.query, config={"k": 10})
+    book_docs = book_retriever.invoke(req.query, config={"k": 1000})
     id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
     with SessionLocal() as session:
         kabis_records = session.query(Kabis).filter(Kabis.id_book.in_(id_books)).all()
@@ -300,7 +300,7 @@ async def chat(req: ChatRequest,
         ]
 
     # --- ВЕКТОРНЫЙ ПОИСК ---
-    vec_docs = retriever.invoke(req.query, config={"k": req.k or 15})  # чуть больше кандидатов
+    vec_docs = retriever.invoke(req.query, config={"k": 50})  # чуть больше кандидатов
 
     # --- РЕРАНКЕР: сортируем vec_docs по смысловой релевантности ---
     pairs = [(req.query, d.page_content or "") for d in vec_docs]
@@ -372,7 +372,7 @@ async def chat(req: ChatRequest,
 
 async def process_row(row, req, retriever, book_retriever, llm):
     # book search
-    book_docs = book_retriever.invoke(row, config={"k": 10})
+    book_docs = book_retriever.invoke(row, config={"k": 5})
     id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
 
     # --- синхронный блок с базой данных ---
@@ -393,7 +393,7 @@ async def process_row(row, req, retriever, book_retriever, llm):
     kb_map = await asyncio.to_thread(fetch_kabis)
 
     # --- vector retrieval + rerank ---
-    vec_docs = retriever.invoke(row, config={"k": req.k or 15})
+    vec_docs = retriever.invoke(row, config={"k": 5})
     pairs = [(req.query, d.page_content or "") for d in vec_docs]
     scores = await asyncio.to_thread(reranker.predict, pairs)
 
