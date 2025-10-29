@@ -246,7 +246,7 @@ async def chat(req: ChatRequest,
     return {"reply": final_answer}
 
 
-async def summarize_card(llm, req, card):
+async def summarize_card(llm, card):
     key, value = card
     context = ''
     cards = {
@@ -351,7 +351,7 @@ async def chat(req: ChatRequest,
                 })
 
     # --- Асинхронное аннотирование ---
-    tasks = [summarize_card(llm, req, card) for card in vector_cards_dictionary.items()]
+    tasks = [summarize_card(llm, card) for card in vector_cards_dictionary.items()]
     annotated_vector_cards = await asyncio.gather(*tasks)
 
     # --- Логируем ---
@@ -370,7 +370,7 @@ async def chat(req: ChatRequest,
     }
 
 
-async def process_row(row, req, retriever, book_retriever, llm):
+async def process_row(row, retriever, book_retriever, llm):
     # book search
     book_docs = book_retriever.invoke(row, config={"k": 5})
     id_books = [d.metadata.get("id_book") for d in book_docs if d.metadata]
@@ -394,7 +394,7 @@ async def process_row(row, req, retriever, book_retriever, llm):
 
     # --- vector retrieval + rerank ---
     vec_docs = retriever.invoke(row, config={"k": 5})
-    pairs = [(req.query, d.page_content or "") for d in vec_docs]
+    pairs = [(row, d.page_content or "") for d in vec_docs]
     scores = await asyncio.to_thread(reranker.predict, pairs)
 
     for d, s in zip(vec_docs, scores):
@@ -402,7 +402,6 @@ async def process_row(row, req, retriever, book_retriever, llm):
 
     vec_docs = sorted(vec_docs, key=lambda x: x.metadata.get("rerank_score", 0), reverse=True)
 
-    # --- формируем карточки ---
     vector_cards_dictionary = {}
     for d in vec_docs:
         m = d.metadata or {}
@@ -414,7 +413,6 @@ async def process_row(row, req, retriever, book_retriever, llm):
         vector_cards_dictionary[id_book]["pages"].append(page)
         vector_cards_dictionary[id_book]["text_snippets"].append(text_snippet)
 
-    # --- enrichment из базы ---
     def enrich_from_db():
         id_books_local = [d.metadata.get("doc_id") for d in vec_docs if d.metadata]
         with SessionLocal() as session:
@@ -438,7 +436,7 @@ async def process_row(row, req, retriever, book_retriever, llm):
     await asyncio.to_thread(enrich_from_db)
 
     # --- summarize ---
-    tasks = [summarize_card(llm, req, card) for card in vector_cards_dictionary.items()]
+    tasks = [summarize_card(llm, card) for card in vector_cards_dictionary.items()]
     annotated_vector_cards = await asyncio.gather(*tasks)
 
     return {
@@ -449,18 +447,17 @@ async def process_row(row, req, retriever, book_retriever, llm):
 
 
 @router.get("/chat_card_recommendations", summary="Рекомендации книг")
-async def chat_card_recommendations(req: ChatRequest,
+async def chat_card_recommendations(
                retriever=Depends(get_retriever_dep),
                book_retriever=Depends(get_book_retriever_dep),
                llm=Depends(get_llm),
                db: Session = Depends(get_db),
                current_user: User = Depends(get_current_user)):
 
-    session_id = req.sessionId or "anonymous"
     user_iin = current_user.iin
     rows = di_iin[user_iin]
 
-    tasks = [process_row(row, req, retriever, book_retriever, llm) for row in rows]
+    tasks = [process_row(row, retriever, book_retriever, llm) for row in rows]
     results = await asyncio.gather(*tasks)
 
     cards = {row: result for row, result in zip(rows, results)}
