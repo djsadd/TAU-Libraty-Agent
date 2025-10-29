@@ -25,7 +25,7 @@ from app.models.books import Document
 from sentence_transformers import CrossEncoder
 
 
-router = APIRouter(prefix="/api", tags=["chat", "chat_card"])
+router = APIRouter(prefix="/api", tags=["chat", "chat_card", "chat_card_recommendations"])
 reranker = CrossEncoder("BAAI/bge-reranker-v2-m3")
 
 
