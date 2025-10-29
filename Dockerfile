@@ -34,6 +34,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Установим Python-зависимости проекта
+COPY new_requirements.txt .
+
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+    # && pip install torch --index-url https://download.pytorch.org/whl/cpu
+
 COPY requirements.txt .
 
 RUN pip install --upgrade pip \
