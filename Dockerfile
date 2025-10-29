@@ -42,9 +42,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
-    # && pip install torch --index-url https://download.pytorch.org/whl/cpu
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install --require-virtualenv --prefer-binary --no-input -r requirements.txt
 
 #RUN pip install unstructured_inference
 #RUN pip install pdf2image
