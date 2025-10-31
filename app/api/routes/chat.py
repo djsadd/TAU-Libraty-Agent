@@ -554,7 +554,7 @@ def get_disciplines_from_platonus(
         JOIN studygroups ON j.StudyGroupID = studygroups.StudyGroupID
         JOIN subjects ON subjects.SubjectID = studygroups.subjectid
         WHERE j.markTypeID IN (2, 3, 4)
-          AND j.year = 2025
+          AND year = 2025
           AND students.iinplt = %s
         GROUP BY discipline;
     """
