@@ -483,6 +483,7 @@ class LLMContextRequest(BaseModel):
     query: str
 #
 
+
 @router.post("/generate_llm_context")
 async def generate_llm_context(payload: LLMContextRequest, current_user: User = Depends(get_current_user)):
     system_role = (
@@ -528,11 +529,10 @@ async def generate_llm_context(payload: LLMContextRequest, current_user: User = 
     }
     return StreamingResponse(gen(), media_type="text/plain; charset=utf-8", headers=headers)
 
-
-@router.get("/students/{iin}/disciplines")
-def get_disciplines_from_platonus(iin: str, db: Session = Depends(get_db)):
-
-    # данные подключения к базе Platonus напрямую
+@router.get("/students/disciplines")
+def get_disciplines_from_platonus(
+        current_user: User = Depends(get_current_user)
+):
     conn = mysql.connector.connect(
         host=settings.PLATONUS_DB_HOST,
         port=int(settings.PLATONUS_DB_PORT),
@@ -541,29 +541,31 @@ def get_disciplines_from_platonus(iin: str, db: Session = Depends(get_db)):
         database=settings.PLATONUS_DB_NAME
     )
 
-    cursor = conn.cursor()
+    iin = current_user.iin
+
+    cursor = conn.cursor(dictionary=True)
+
     cursor.execute("SELECT DATABASE(), VERSION();")
     print("Текущая база и версия:", cursor.fetchone())
-    cursor.close()
-    conn.close()
 
-    # запрос уже через твою локальную базу SQLAlchemy
-    query = text("""
+    query = """
         SELECT 
-            CONCAT(students.lastname, ' ', students.firstname, ' ', students.patronymic) AS fio,
             subjects.SubjectNameRU AS discipline
         FROM journal j
         JOIN students ON j.StudentID = students.StudentID
         JOIN studygroups ON j.StudyGroupID = studygroups.StudyGroupID
         JOIN subjects ON subjects.SubjectID = studygroups.subjectid
         WHERE j.markTypeID IN (2, 3, 4)
-          AND year = :year
-          AND students.iinplt = :iin
-    """)
+          AND j.year = 2025
+          AND students.iinplt = %s
+        GROUP BY discipline;
+    """
 
-    result = db.execute(query, {"year": 2025, "iin": iin}).fetchall()
+    cursor.execute(query, (iin,))
+    results = cursor.fetchall()
 
-    return [
-        {"ФИО обучающегося": row.fio, "Дисциплина": row.discipline}
-        for row in result
-    ]
+    cursor.close()
+    conn.close()
+    disciplines = [row["discipline"] for row in results]
+
+    return {"disciplines": disciplines}

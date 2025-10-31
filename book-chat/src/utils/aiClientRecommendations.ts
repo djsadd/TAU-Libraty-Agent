@@ -13,7 +13,7 @@ function getAuthToken(): string {
  */
 export async function fetchChatCardRecommendations(topics?: string[]): Promise<any> {
   const token = getAuthToken();
-  const base = "/api/chat_card_recommendations";              // <-- ключевое изменение: добавили /api
+  const base = "/api/students/disciplines";              // <-- ключевое изменение: добавили /api
   const withTopics = topics && topics.length ? `?topics=${encodeURIComponent(topics.join(","))}` : "";
 
   // попытка 1: GET без слэша
