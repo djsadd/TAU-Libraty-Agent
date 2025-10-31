@@ -379,10 +379,7 @@ async def chat(req: ChatRequest,
 async def educational_program_list(
     current_user: User = Depends(get_current_user)
 ):
-    print(get_disciplines_from_platonus(current_user.iin))
-    return {
-        "educational_disciplines": di_iin[current_user.iin]
-    }
+    return get_disciplines_from_platonus(current_user)
 
 
 async def process_row(row, retriever, book_retriever, llm):
@@ -528,6 +525,7 @@ async def generate_llm_context(payload: LLMContextRequest, current_user: User = 
         "Connection": "keep-alive",
     }
     return StreamingResponse(gen(), media_type="text/plain; charset=utf-8", headers=headers)
+
 
 @router.get("/students/disciplines")
 def get_disciplines_from_platonus(
