@@ -528,45 +528,26 @@ async def generate_llm_context(payload: LLMContextRequest, current_user: User = 
     }
     return StreamingResponse(gen(), media_type="text/plain; charset=utf-8", headers=headers)
 
-
 @router.get("/students/{iin}/disciplines")
 def get_disciplines_from_platonus(iin: str, db: Session = Depends(get_db)):
-    ssh_host = settings.SSH_SERVER_PLATONUS_HOST
-    ssh_port = int(settings.SSH_SERVER_PLATONUS_PORT)
-    ssh_user = settings.SSH_SERVER_PLATONUS_USER
-    ssh_password = settings.SSH_SERVER_PLATONUS_PASSWORD
 
-    db_host = settings.PLATONUS_DB_HOST
-    db_port = int(settings.PLATONUS_DB_PORT)
-    db_user = settings.PLATONUS_DB_USER
-    db_password = settings.PLATONUS_DB_PASSWORD
-    db_name = settings.PLATONUS_DB_NAME
-    with SSHTunnelForwarder(
-            (ssh_host, ssh_port),
-            ssh_username=ssh_user,
-            ssh_password=ssh_password,
-            remote_bind_address=(db_host, db_port)
-    ) as tunnel:
-        print(f"SSH-туннель запущен на порту {tunnel.local_bind_port}")
+    # данные подключения к базе Platonus напрямую
+    conn = mysql.connector.connect(
+        host=settings.PLATONUS_DB_HOST,
+        port=int(settings.PLATONUS_DB_PORT),
+        user=settings.PLATONUS_DB_USER,
+        password=settings.PLATONUS_DB_PASSWORD,
+        database=settings.PLATONUS_DB_NAME
+    )
 
-        # --- подключаемся к MySQL через туннель ---
-        conn = mysql.connector.connect(
-            host=db_host,
-            port=int(tunnel.local_bind_port),
-            user=db_user,
-            password=db_password,
-            database=db_name
-        )
+    cursor = conn.cursor()
+    cursor.execute("SELECT DATABASE(), VERSION();")
+    print("Текущая база и версия:", cursor.fetchone())
+    cursor.close()
+    conn.close()
 
-        cursor = conn.cursor()
-        cursor.execute("SELECT DATABASE(), VERSION();")
-        print("Текущая база и версия:", cursor.fetchone())
-
-        cursor.close()
-        conn.close()
-
-    query = text(
-        """
+    # запрос уже через твою локальную базу SQLAlchemy
+    query = text("""
         SELECT 
             CONCAT(students.lastname, ' ', students.firstname, ' ', students.patronymic) AS fio,
             subjects.SubjectNameRU AS discipline
@@ -577,8 +558,8 @@ def get_disciplines_from_platonus(iin: str, db: Session = Depends(get_db)):
         WHERE j.markTypeID IN (2, 3, 4)
           AND year = :year
           AND students.iinplt = :iin
-    """
-                 )
+    """)
+
     result = db.execute(query, {"year": 2025, "iin": iin}).fetchall()
 
     return [
