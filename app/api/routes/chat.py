@@ -532,12 +532,12 @@ async def generate_llm_context(payload: LLMContextRequest, current_user: User = 
 @router.get("/students/{iin}/disciplines")
 def get_disciplines_from_platonus(iin: str, db: Session = Depends(get_db)):
     ssh_host = settings.SSH_SERVER_PLATONUS_HOST
-    ssh_port = settings.SSH_SERVER_PLATONUS_PORT
+    ssh_port = int(settings.SSH_SERVER_PLATONUS_PORT)
     ssh_user = settings.SSH_SERVER_PLATONUS_USER
     ssh_password = settings.SSH_SERVER_PLATONUS_PASSWORD
 
     db_host = settings.PLATONUS_DB_HOST
-    db_port = settings.PLATONUS_DB_PORT
+    db_port = int(settings.PLATONUS_DB_PORT)
     db_user = settings.PLATONUS_DB_USER
     db_password = settings.PLATONUS_DB_PASSWORD
     db_name = settings.PLATONUS_DB_NAME
@@ -552,7 +552,7 @@ def get_disciplines_from_platonus(iin: str, db: Session = Depends(get_db)):
         # --- подключаемся к MySQL через туннель ---
         conn = mysql.connector.connect(
             host=db_host,
-            port=tunnel.local_bind_port,
+            port=int(tunnel.local_bind_port),
             user=db_user,
             password=db_password,
             database=db_name

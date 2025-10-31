@@ -36,15 +36,15 @@ class Settings(BaseSettings):
     LIB_TAU_HOST: str
     LIB_TAU_PORT: str
 
-    SSH_SERVER_PLATONUS_HOST: str
-    SSH_SERVER_PLATONUS_USER: str
-    SSH_SERVER_PLATONUS_PASSWORD: str
-    SSH_SERVER_PLATONUS_PORT: str
-    PLATONUS_DB_PORT: str
-    PLATONUS_DB_HOST: str
-    PLATONUS_DB_USER: str
-    PLATONUS_DB_PASSWORD: str
-    PLATONUS_DB_NAME: str
+    # SSH_SERVER_PLATONUS_HOST: str
+    # SSH_SERVER_PLATONUS_USER: str
+    # SSH_SERVER_PLATONUS_PASSWORD: str
+    # SSH_SERVER_PLATONUS_PORT: str
+    # PLATONUS_DB_PORT: str
+    # PLATONUS_DB_HOST: str
+    # PLATONUS_DB_USER: str
+    # PLATONUS_DB_PASSWORD: str
+    # PLATONUS_DB_NAME: str
 
     # Настройки для pydantic-settings v2
     model_config = SettingsConfigDict(
