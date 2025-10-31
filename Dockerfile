@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificat
 # Переменные окружения
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y openssh-client
 
 # Установим системные зависимости
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -481,7 +481,7 @@ class LLMContextRequest(BaseModel):
     text_snippet: str
     title: str
     query: str
-
+#
 
 @router.post("/generate_llm_context")
 async def generate_llm_context(payload: LLMContextRequest, current_user: User = Depends(get_current_user)):
@@ -527,6 +527,7 @@ async def generate_llm_context(payload: LLMContextRequest, current_user: User = 
         "Connection": "keep-alive",
     }
     return StreamingResponse(gen(), media_type="text/plain; charset=utf-8", headers=headers)
+
 
 @router.get("/students/{iin}/disciplines")
 def get_disciplines_from_platonus(iin: str, db: Session = Depends(get_db)):
