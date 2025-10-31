@@ -566,4 +566,4 @@ def get_disciplines_from_platonus(
     conn.close()
     disciplines = [row["discipline"] for row in results]
 
-    return {"disciplines": disciplines}
+    return {"educational_disciplines": disciplines}
