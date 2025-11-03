@@ -15,7 +15,6 @@ from app.api.routes import auth
 
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
-from core.cors import setup_cors
 from app.api.routes.users import get_current_user  # твоя функция проверки JWT
 
 # Логгер
